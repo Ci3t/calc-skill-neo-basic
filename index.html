@@ -23,7 +23,7 @@
       border-radius: 20px;
       box-shadow: 0 0 25px rgba(0, 255, 255, 0.2);
       text-align: center;
-      width: 320px;
+      width: 360px;
       animation: fadeIn 1s ease;
     }
 
@@ -77,10 +77,11 @@
 
     .result {
       margin-top: 25px;
-      font-size: 1.3em;
+      font-size: 1em;
       font-weight: bold;
       color: #00ffcc;
       text-shadow: 0 0 8px #00ffcc;
+      white-space: pre-line;
     }
 
     @keyframes fadeIn {
@@ -95,16 +96,25 @@
     <h1>Skill Damage Calculator</h1>
 
     <label for="minDamage">Base Min Damage:</label>
-    <input type="number" id="minDamage" placeholder="e.g. 2583">
+    <input type="number" id="minDamage" placeholder="e.g. 2594">
 
     <label for="maxDamage">Base Max Damage:</label>
-    <input type="number" id="maxDamage" placeholder="e.g. 2787">
+    <input type="number" id="maxDamage" placeholder="e.g. 2799">
 
-    <label for="gmLevel">Grandmaster Level:</label>
+    <label for="gmLevel">Grandmaster Level (optional):</label>
     <input type="number" id="gmLevel" placeholder="e.g. 1">
 
-    <label for="percentPerLevel">Damage % per Level:</label>
+    <label for="percentPerLevel">Damage % per Level (optional):</label>
     <input type="number" step="0.01" id="percentPerLevel" placeholder="e.g. 3.90">
+
+    <label for="attackPower">Attack Power (AP):</label>
+    <input type="number" id="attackPower" value="700" placeholder="e.g. 700">
+
+    <label for="crit">Critical (points):</label>
+    <input type="number" id="crit" value="1711" placeholder="e.g. 1711">
+
+    <label for="critDmg">Critical Damage (points):</label>
+    <input type="number" id="critDmg" value="1117" placeholder="e.g. 1117">
 
     <button onclick="calculateDamage()">Calculate</button>
 
@@ -115,20 +125,43 @@
     function calculateDamage() {
       const min = parseFloat(document.getElementById('minDamage').value);
       const max = parseFloat(document.getElementById('maxDamage').value);
-      const level = parseFloat(document.getElementById('gmLevel').value);
-      const percent = parseFloat(document.getElementById('percentPerLevel').value);
+      const level = parseFloat(document.getElementById('gmLevel').value) || 0;
+      const percent = parseFloat(document.getElementById('percentPerLevel').value) || 0;
+      const ap = parseFloat(document.getElementById('attackPower').value);
+      const crit = parseFloat(document.getElementById('crit').value);
+      const critDmg = parseFloat(document.getElementById('critDmg').value);
 
-      if (isNaN(min) || isNaN(max) || isNaN(level) || isNaN(percent)) {
-        document.getElementById('result').innerText = '⚠️ Please fill in all fields correctly.';
+      if (isNaN(min) || isNaN(max) || isNaN(ap) || isNaN(crit) || isNaN(critDmg)) {
+        document.getElementById('result').innerText = '⚠️ Please fill in all required fields.';
         return;
       }
 
       const multiplier = 1 + ((percent / 100) * level);
-      const newMin = (min * multiplier).toFixed(2);
-      const newMax = (max * multiplier).toFixed(2);
+      const baseMin = min * multiplier;
+      const baseMax = max * multiplier;
+
+      const normalMin = baseMin + ap;
+      const normalMax = baseMax + ap;
+      const avgNormal = (normalMin + normalMax) / 2;
+
+      // Corrected Crit Formulas
+      const critRate = (96.98979 * crit) / (1124.069 + crit);
+      const critMultiplier = (290.8 * critDmg) / (2102.36 + critDmg) + 125;
+
+      // Crit Damage = (Base Damage × Multiplier) + AP
+      const critMin = (baseMin * (critMultiplier / 100)) + ap;
+      const critMax = (baseMax * (critMultiplier / 100)) + ap;
+      const avgCrit = (critMin + critMax) / 2;
 
       document.getElementById('result').innerText =
-        `🔹 New Damage: ${newMin} – ${newMax}`;
+        `🔸 Non-Crit Damage: ${normalMin.toFixed(2)} – ${normalMax.toFixed(2)}
+🔹 Crit Damage: ${critMin.toFixed(2)} – ${critMax.toFixed(2)}
+
+⭐ Avg Hit (non-crit): ${avgNormal.toFixed(2)}
+💥 Avg Hit (crit): ${avgCrit.toFixed(2)}
+
+📈 Crit Rate: ${critRate.toFixed(2)}%
+🔥 Crit Damage Multiplier: ${critMultiplier.toFixed(2)}%`;
     }
   </script>
 
