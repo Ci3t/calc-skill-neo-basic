@@ -56,6 +56,7 @@ function App() {
       return;
     }
 
+    // Grandmaster multiplier
     const multiplier = 1 + (percent / 100) * level;
     const effectivePercent = percent * 0.728;
     const bonusMin = level > 0 ? min * (effectivePercent / 100) * level : 0;
@@ -63,23 +64,30 @@ function App() {
     const baseMin = min + bonusMin;
     const baseMax = max + bonusMax;
 
+    // Non-crit
     const badgeBonus = ap * (soulBadgeValue / 100);
     const normalMin = (baseMin + ap + badgeBonus) * 0.88;
     const normalMax = (baseMax + ap + badgeBonus) * 0.88;
     const avgNormal = (normalMin + normalMax) / 2;
 
+    // Crit multiplier fix
     const critRate = (96.98979 * critValue) / (1124.069 + critValue);
-    const critMultiplier = 100 + (160 * critDmgValue) / (1230 + critDmgValue);
-
-    // Adjusted crit formula (apply multiplier to full base + AP)
+    const critMultiplier =
+      (290.8 * critDmgValue) / (2102.36 + critDmgValue) + 125;
     const critScale =
       1 + Math.min(0.1, Math.max(0, (critMultiplier - 150) / 500));
+
+    // Use avg base, then calculate crit-damaged base only (NOT ap/badge!)
     const avgBase = (baseMin + baseMax) / 2;
     const totalStats = ap + critValue + critDmgValue;
     const weight = Math.min(1, Math.max(0, (totalStats - 3000) / 3000));
     const anchorBase = baseMin * (1 - weight) + avgBase * weight;
-    const critBase = anchorBase * (critMultiplier / 100);
-    const baseCrit = (critBase + ap + badgeBonus) * critScale;
+
+    // ✅ Correct crit logic:
+    // Normalize critMultiplier based on 125% base expectation
+    const baseNormal = anchorBase + ap + badgeBonus;
+    const baseCrit = baseNormal * (critMultiplier / 155) * critScale;
+
     const critMin = baseCrit * 0.985 * 1.015;
     const critMax = baseCrit * 1.015 * 1.015;
     const avgCrit = (critMin + critMax) / 2;
@@ -409,6 +417,13 @@ function App() {
           </div>
         )}
       </div>
+      <footer className="mt-2 flex justify-center items-center">
+        <div className="bg-black/40 p-2  rounded-lg border-l-4 border-cyan-600">
+          <h2 className="text-cyan-400 text-lg uppercase tracking-wide flex items-center  font-semibold">
+            &#169; Ci3t {new Date().getFullYear()}
+          </h2>
+        </div>
+      </footer>
     </div>
   );
 }
