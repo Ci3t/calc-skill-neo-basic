@@ -12,7 +12,6 @@ function getBaseWithGM(min, max, level, percentPerLevel) {
   };
 }
 
-// --- Crit Multiplier (fixed) ---
 function calculateCritMultiplier(cdmgPoints) {
   return (290.8 * cdmgPoints) / (2102.36 + cdmgPoints) + 125;
 }
@@ -45,6 +44,7 @@ function App() {
     critDmg: "",
     accuracy: "",
     debuffResist: "",
+    currentGMLevel: 0,
   });
 
   // Define book types and their values
@@ -106,6 +106,13 @@ function App() {
     }));
   };
 
+  const handleCurrentGMLevelChange = (change) => {
+    setFormData((prev) => ({
+      ...prev,
+      currentGMLevel: Math.max(0, parseInt(prev.currentGMLevel || 0) + change),
+    }));
+  };
+
   const handleBookCountChange = (bookId, change) => {
     setBooks((prevBooks) =>
       prevBooks.map((book) =>
@@ -116,115 +123,133 @@ function App() {
     );
   };
 
-  const calculateDamage = () => {
-    const { minDamage, maxDamage, attackPower, soulBadge, crit, critDmg } =
-      formData;
-
-    // Get GM values from books
-    const { gmLevel, percentPerLevel } = calculateGMTotals();
-
+  function calculateDamage({
+    minDamage,
+    maxDamage,
+    attackPower,
+    soulBadge,
+    crit,
+    critDmg,
+    currentGMLevel,
+    gmLevel,
+    percentPerLevel,
+  }) {
+    // --- Parse Inputs ---
     const min = parseFloat(minDamage);
     const max = parseFloat(maxDamage);
-    const level = parseFloat(gmLevel) || 0;
-    const percent = parseFloat(percentPerLevel) || 0;
     const ap = parseFloat(attackPower);
     const badgePercent = parseFloat(soulBadge) || 0;
     const critValue = parseFloat(crit);
     const critDmgValue = parseFloat(critDmg);
+    const currentLevel = parseInt(currentGMLevel) || 0;
+    const bookLevel = parseFloat(gmLevel) || 0;
+    const bookPercent = parseFloat(percentPerLevel) || 0;
 
+    // --- Early Return for missing crit inputs ---
     if (isNaN(critValue) || isNaN(critDmgValue)) {
-      setResult({
+      return {
         error: true,
-        message: "⚠️ Please enter both Critical and Crit Damage points.",
-      });
-      return;
+        message:
+          "\u26A0\uFE0F Please enter both Critical and Crit Damage points.",
+      };
     }
 
+    // --- Early Return for missing base inputs ---
     if (isNaN(min) || isNaN(max) || isNaN(ap)) {
-      const critRate = calculateCritRate(critValue);
-      const critMultiplier = calculateCritMultiplier(critDmgValue);
-
-      setResult({
+      return {
         error: false,
-        critRateCalculated: `📈 Crit Rate: ${critRate.toFixed(2)}%`,
-        critMultiplierCalculated: `🔥 Crit Damage Multiplier: ${critMultiplier.toFixed(
-          2
-        )}%`,
-        message: "ℹ️ Enter full stats to calculate full damage output.",
-      });
-      return;
+        critRateCalculated: `\uD83D\uDCC8 Crit Rate: ${calculateCritRate(
+          critValue
+        ).toFixed(2)}%`,
+        critMultiplierCalculated: `\uD83D\uDD25 Crit Damage Multiplier: ${calculateCritMultiplier(
+          critDmgValue
+        ).toFixed(2)}%`,
+        message:
+          "\u2139\uFE0F Enter full stats to calculate full damage output.",
+      };
     }
 
-    // --- Base Damage with GM Bonuses ---
-    const gmMultiplier = 1 + (percent / 100) * level;
-    const effectivePercent = percent * 0.728;
-    const bonusMin = level > 0 ? min * (effectivePercent / 100) * level : 0;
-    const bonusMax = level > 0 ? max * (effectivePercent / 100) * level : 0;
+    // --- GM Calculation Logic ---
+    const standardPercentPerLevel = 1.9;
+    const effectivePercentPerPoint = 0.728;
+    const currentGMPercent = currentLevel * standardPercentPerLevel;
+    const totalBookPercent = bookPercent;
+    const netBookPercent = Math.max(0, totalBookPercent - currentGMPercent);
+    const effectivePercent = netBookPercent * effectivePercentPerPoint;
+
+    const bonusMin = min * (effectivePercent / 100) * bookLevel;
+    const bonusMax = max * (effectivePercent / 100) * bookLevel;
+
     const baseMin = min + bonusMin;
     const baseMax = max + bonusMax;
 
     // --- Badge Bonus ---
     const badgeBonus = ap * (badgePercent / 100);
 
-    // --- Normal Hit ---
+    // --- Normal Damage ---
     const normalMin = (baseMin + ap + badgeBonus) * 0.88;
     const normalMax = (baseMax + ap + badgeBonus) * 0.88;
     const avgNormal = (normalMin + normalMax) / 2;
 
-    // --- Crit Rate Calculation ---
-    const critRate = (96.98979 * critValue) / (1124.069 + critValue);
+    // --- Crit Calculations ---
+    const critRate = calculateCritRate(critValue);
+    const critMultiplier = calculateCritMultiplier(critDmgValue);
+    const critScale = calculateCritScale(critMultiplier);
 
-    // --- Crit Multiplier (correct formula) ---
-    const critMultiplier =
-      (290.8 * critDmgValue) / (2102.36 + critDmgValue) + 125;
-
-    // --- Crit Scale (bonus scaling for higher crit%) ---
-    const critScale =
-      1 + Math.min(0.1, Math.max(0, (critMultiplier - 150) / 500));
-
-    // --- Anchor Base (used for consistent crit output) ---
     const avgBase = (baseMin + baseMax) / 2;
     const totalStats = ap + critValue + critDmgValue;
     const weight = Math.min(1, Math.max(0, (totalStats - 3000) / 3000));
     const anchorBase = baseMin * (1 - weight) + avgBase * weight;
 
-    // --- Final Base including all sources ---
     const baseNormal = anchorBase + ap + badgeBonus;
-
-    // ✅ FINAL Crit Damage Calc
-    // Normalize critMultiplier to original formula (around 180%)
     const baseCrit = baseNormal * (critMultiplier / 155) * critScale;
     const critMin = baseCrit * 0.985 * 1.015;
     const critMax = baseCrit * 1.015 * 1.015;
     const avgCrit = (critMin + critMax) / 2;
 
-    // --- Output Results ---
-    setResult({
+    // --- Output ---
+    return {
       error: false,
-      baseWithoutGM: `🟫 Base Damage (no GM): ${min.toFixed(0)} – ${max.toFixed(
-        0
-      )}`,
-      baseWithGM: `🟪 Base Damage (with GM): ${baseMin.toFixed(
+      originalBaseValues: `\uD83D\uDD04 Skill Base Damage: ${min.toFixed(
         2
-      )} – ${baseMax.toFixed(2)}`,
-      normalDamage: `🔸 Non-Crit Damage: ${normalMin.toFixed(
+      )} – ${max.toFixed(2)}`,
+      baseWithoutGM: `\uD83D\uDFEB Base (already includes GM ${currentLevel}): ${min.toFixed(
+        0
+      )} – ${max.toFixed(0)}`,
+
+      normalDamage: `\uD83D\uDD38 Non-Crit Damage: ${normalMin.toFixed(
         2
       )} – ${normalMax.toFixed(2)}`,
-      critDamage: `🔹 Crit Damage: ${critMin.toFixed(2)} – ${critMax.toFixed(
+      critDamage: `\uD83D\uDD39 Crit Damage: ${critMin.toFixed(
         2
-      )}`,
-      avgNormalHit: `⭐ Avg Hit (non-crit): ${avgNormal.toFixed(2)}`,
-      avgCritHit: `💥 Avg Hit (crit): ${avgCrit.toFixed(2)}`,
-      critRateCalculated: `📈 Crit Rate: ${critRate.toFixed(2)}%`,
-      critMultiplierCalculated: `🔥 Crit Damage Multiplier: ${critMultiplier.toFixed(
+      )} – ${critMax.toFixed(2)}`,
+      avgNormalHit: `\u2B50 Avg Hit (non-crit): ${avgNormal.toFixed(2)}`,
+      avgCritHit: `\uD83D\uDCA5 Avg Hit (crit): ${avgCrit.toFixed(2)}`,
+      critRateCalculated: `\uD83D\uDCC8 Crit Rate: ${critRate.toFixed(2)}%`,
+      critMultiplierCalculated: `\uD83D\uDD25 Crit Damage Multiplier: ${critMultiplier.toFixed(
         2
       )}%`,
-      critScaleCalculated: `🛠 Crit Scale: ${critScale.toFixed(3)}`,
-    });
-  };
+      critScaleCalculated: `\uD83D\uDEE0\uFE0F Crit Scale: ${critScale.toFixed(
+        3
+      )}`,
+    };
+  }
+
+  function calculateCritRate(critPoints) {
+    return (96.98979 * critPoints) / (1124.069 + critPoints);
+  }
+
+  function calculateCritMultiplier(cdmgPoints) {
+    return (290.8 * cdmgPoints) / (2102.36 + cdmgPoints) + 125;
+  }
+
+  function calculateCritScale(multiplier) {
+    return 1 + Math.min(0.1, Math.max(0, (multiplier - 150) / 500));
+  }
 
   // Get GM totals for display
   const { gmLevel, percentPerLevel } = calculateGMTotals();
+  const currentGMPercent = (formData.currentGMLevel || 0) * 1.9;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-teal-900 py-8 px-4 flex flex-col items-center justify-center">
@@ -266,24 +291,15 @@ function App() {
                 Fill in your base skill damage and character stats values.
               </li>
               <li>
-                For Grandmaster skills (optional):
-                <ul className="list-disc pl-5 mt-1 space-y-1">
-                  <li>
-                    <strong>If you already have multi-skill books:</strong>{" "}
-                    Leave Grandmaster fields empty since the game already scaled
-                    it in base skill damage.
-                  </li>
-                  <li>
-                    <strong> If you want to test additional books</strong>:{" "}
-                    <br />
-                    Select the number of additional books you want to test using
-                    the book selector interface.
-                  </li>
-                  <li>
-                    <strong>If you have no skill books:</strong> Leave all book
-                    counters at zero.
-                  </li>
-                </ul>
+                <strong className="text-red-500">
+                  For skills with existing GM levels:
+                </strong>{" "}
+                Use the Current GM Level selector to indicate how many GM levels
+                your skill already has.
+              </li>
+              <li>
+                <strong>For testing additional books:</strong> Use the book
+                selector to add additional books you want to simulate.
               </li>
               <li>
                 Press the Calculate button to get your damage information.
@@ -323,7 +339,7 @@ function App() {
                 <span className="w-2 h-2 bg-cyan-400 rounded-full mr-2"></span>
                 Base Skill Damage
               </h2>
-              <div className=" grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label
                     htmlFor="minDamage"
@@ -357,13 +373,52 @@ function App() {
                   />
                 </div>
               </div>
+
+              {/* Current GM Level Selector */}
+              <div className="mt-4 p-3 bg-gray-800/40 rounded-lg border border-purple-500/20">
+                <h3 className="text-purple-300 font-medium mb-2">
+                  Current GM Level
+                </h3>
+                <p className="text-white/70 text-sm mb-3">
+                  If your skill already has books applied, set this to your
+                  current GM level.{" "}
+                  <span className="font-semibold text-red-500">
+                    {" (each level = 1.90%)"}
+                  </span>{" "}
+                </p>
+
+                <div className="flex items-center">
+                  <button
+                    onClick={() => handleCurrentGMLevelChange(-1)}
+                    className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-900 text-purple-300 hover:bg-purple-800 transition-colors cursor-pointer"
+                  >
+                    -
+                  </button>
+                  <span className="mx-3 text-white w-10 text-center">
+                    {formData.currentGMLevel || 0}
+                  </span>
+                  <button
+                    onClick={() => handleCurrentGMLevelChange(1)}
+                    className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-900 text-purple-300 hover:bg-purple-800 transition-colors cursor-pointer"
+                  >
+                    +
+                  </button>
+
+                  <div className="ml-4">
+                    <span className="text-purple-200">GM Percent: </span>
+                    <span className="text-white font-medium">
+                      {currentGMPercent.toFixed(2)}%
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Grandmaster Skill Section with Book Selection UI */}
             <div className="bg-black/40 p-5 rounded-lg border-l-4 border-cyan-600">
               <h2 className="text-cyan-400 text-lg uppercase tracking-wide flex items-center mb-4 font-semibold">
                 <span className="w-2 h-2 bg-cyan-400 rounded-full mr-2"></span>
-                Grandmaster Skill
+                Additional GM Books
               </h2>
 
               {/* Book selection interface */}
@@ -398,16 +453,38 @@ function App() {
 
                 {/* Summary display */}
                 <div className="mt-4 p-3 bg-gray-900/40 rounded-lg border border-cyan-500/20">
-                  <div className="flex justify-between">
-                    <span className="text-cyan-200">Total GM Level:</span>
-                    <span className="text-white font-medium">{gmLevel}</span>
-                  </div>
-                  <div className="flex justify-between mt-1">
-                    <span className="text-cyan-200">Total Percent:</span>
-                    <span className="text-white font-medium">
-                      {percentPerLevel.toFixed(2)}%
-                    </span>
-                  </div>
+                  {(() => {
+                    const currentLevel = parseInt(formData.currentGMLevel) || 0;
+                    const excessLevel = Math.max(0, gmLevel - currentLevel);
+                    const totalLevel = currentLevel + gmLevel;
+                    const standardPercentPerLevel = 1.9;
+                    const excessPercent = excessLevel * standardPercentPerLevel;
+
+                    return (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-cyan-200">
+                            Additional GM Level:
+                          </span>
+                          <span className="text-white font-medium">
+                            {excessLevel}
+                          </span>
+                        </div>
+                        <div className="flex justify-between mt-1">
+                          <span className="text-cyan-200">
+                            Additional Percent:
+                          </span>
+                          <span className="text-white font-medium">
+                            {excessPercent.toFixed(2)}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between mt-1 text-yellow-300 font-semibold">
+                          <span>Total GM Level:</span>
+                          <span>{totalLevel}</span>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -415,7 +492,6 @@ function App() {
 
           {/* Right Column */}
           <div className="space-y-6">
-            {/* Character Stats Section */}
             {/* Character Stats Section */}
             <div className="bg-black/40 p-5 rounded-lg border-l-4 border-cyan-600">
               <h2 className="text-cyan-400 text-lg uppercase tracking-wide flex items-center mb-4 font-semibold">
@@ -469,7 +545,14 @@ function App() {
         </div>
 
         <button
-          onClick={calculateDamage}
+          onClick={() => {
+            const result = calculateDamage({
+              ...formData,
+              gmLevel,
+              percentPerLevel,
+            });
+            setResult(result);
+          }}
           className="w-full mt-6 py-4 px-6 bg-gradient-to-r from-cyan-600 to-cyan-400 text-white font-bold text-lg tracking-wide uppercase rounded-lg hover:from-cyan-500 hover:to-cyan-300 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/40 transform hover:-translate-y-1 active:translate-y-0 cursor-pointer"
         >
           Calculate
@@ -488,8 +571,8 @@ function App() {
             ) : (
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <p>{result.baseWithoutGM}</p>
-                  <p>{result.baseWithGM}</p>
+                  <p>{result.originalBaseValues}</p>
+
                   <p>{result.normalDamage}</p>
                   <p>{result.critDamage}</p>
                 </div>
@@ -498,7 +581,7 @@ function App() {
                   <p>{result.avgCritHit}</p>
                   <p>{result.critRateCalculated}</p>
                   <p>{result.critMultiplierCalculated}</p>
-                  <p>{result.critScaleCalculated}</p>
+                  {/* <p>{result.critScaleCalculated}</p> */}
                 </div>
               </div>
             )}
@@ -506,8 +589,8 @@ function App() {
         )}
       </div>
       <footer className="mt-2 flex justify-center items-center">
-        <div className="bg-black/40 p-2  rounded-lg border-l-4 border-cyan-600">
-          <h2 className="text-cyan-400 text-lg uppercase tracking-wide flex items-center  font-semibold">
+        <div className="bg-black/40 p-2 rounded-lg border-l-4 border-cyan-600">
+          <h2 className="text-cyan-400 text-lg uppercase tracking-wide flex items-center font-semibold">
             &#169; Ci3t {new Date().getFullYear()}
           </h2>
         </div>

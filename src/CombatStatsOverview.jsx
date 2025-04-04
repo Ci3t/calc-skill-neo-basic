@@ -114,38 +114,36 @@ export default function CombatStatsOverview({
         <div className="flex justify-between text-cyan-200">
           <span>📈 Crit Rate:</span>
           <span className="text-white font-medium">
-            {!isNaN(parsedCrit)
-              ? `${calculateCritRate(parsedCrit).toFixed(2)}%`
-              : "--"}
+            {isNaN(parsedCrit)
+              ? "--"
+              : `${calculateCritRate(crit).toFixed(2)}%`}
           </span>
         </div>
 
         <div className="flex justify-between text-cyan-200">
           <span>🔥 Crit Multiplier:</span>
           <span className="text-white font-medium">
-            {!isNaN(parsedCritDmg)
-              ? `${calculateCritMultiplier(parsedCritDmg).toFixed(2)}%`
-              : "--"}
+            {isNaN(parsedCritDmg)
+              ? "--"
+              : `${calculateCritMultiplier(critDmg).toFixed(2)}%`}
           </span>
         </div>
 
         <div className="flex justify-between text-cyan-200">
           <span>🎯 Accuracy:</span>
           <span className="text-white font-medium">
-            {!isNaN(parsedAccuracy)
-              ? `${calculateAccuracyPercent(parsedAccuracy).toFixed(2)}%`
-              : "--"}
+            {isNaN(parsedAccuracy)
+              ? "--"
+              : `${calculateAccuracyPercent(accuracy).toFixed(2)}%`}
           </span>
         </div>
 
         <div className="flex justify-between text-cyan-200">
           <span>🛡️ Debuff Resistance:</span>
           <span className="text-white font-medium">
-            {!isNaN(parsedDebuffResist)
-              ? `${calculateDebuffResistPercent(parsedDebuffResist).toFixed(
-                  2
-                )}%`
-              : "--"}
+            {isNaN(parsedDebuffResist)
+              ? "--"
+              : `${calculateDebuffResistPercent(debuffResist).toFixed(2)}%`}
           </span>
         </div>
       </div>
