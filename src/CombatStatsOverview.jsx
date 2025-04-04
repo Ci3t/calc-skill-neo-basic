@@ -116,7 +116,7 @@ export default function CombatStatsOverview({
           <span className="text-white font-medium">
             {isNaN(parsedCrit)
               ? "--"
-              : `${calculateCritRate(crit).toFixed(2)}%`}
+              : `${calculateCritRate(parsedCrit).toFixed(2)}%`}
           </span>
         </div>
 
@@ -125,7 +125,7 @@ export default function CombatStatsOverview({
           <span className="text-white font-medium">
             {isNaN(parsedCritDmg)
               ? "--"
-              : `${calculateCritMultiplier(critDmg).toFixed(2)}%`}
+              : `${calculateCritMultiplier(parsedCritDmg).toFixed(2)}%`}
           </span>
         </div>
 
@@ -134,7 +134,7 @@ export default function CombatStatsOverview({
           <span className="text-white font-medium">
             {isNaN(parsedAccuracy)
               ? "--"
-              : `${calculateAccuracyPercent(accuracy).toFixed(2)}%`}
+              : `${calculateAccuracyPercent(parsedAccuracy).toFixed(2)}%`}
           </span>
         </div>
 
@@ -143,7 +143,9 @@ export default function CombatStatsOverview({
           <span className="text-white font-medium">
             {isNaN(parsedDebuffResist)
               ? "--"
-              : `${calculateDebuffResistPercent(debuffResist).toFixed(2)}%`}
+              : `${calculateDebuffResistPercent(parsedDebuffResist).toFixed(
+                  2
+                )}%`}
           </span>
         </div>
       </div>
