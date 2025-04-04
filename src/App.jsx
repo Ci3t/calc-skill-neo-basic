@@ -1,17 +1,102 @@
 import { useState } from "react";
+import CombatStatsOverview from "./CombatStatsOverview";
+
+// --- Grandmaster Bonus ---
+function getBaseWithGM(min, max, level, percentPerLevel) {
+  const effectivePercent = percentPerLevel * 0.728;
+  const bonusMin = level > 0 ? min * (effectivePercent / 100) * level : 0;
+  const bonusMax = level > 0 ? max * (effectivePercent / 100) * level : 0;
+  return {
+    baseMin: min + bonusMin,
+    baseMax: max + bonusMax,
+  };
+}
+
+// --- Crit Multiplier (fixed) ---
+function calculateCritMultiplier(cdmgPoints) {
+  return (290.8 * cdmgPoints) / (2102.36 + cdmgPoints) + 125;
+}
+
+// --- Crit Scale (based on crit multiplier) ---
+function calculateCritScale(multiplier) {
+  return 1 + Math.min(0.1, Math.max(0, (multiplier - 150) / 500));
+}
+
+// --- Crit Rate (based on crit points) ---
+function calculateCritRate(critPoints) {
+  return (96.98979 * critPoints) / (1124.069 + critPoints);
+}
+
+// --- Weighted average base (used for crit smoothing) ---
+function calculateAnchorBase(baseMin, baseMax, totalStats) {
+  const avgBase = (baseMin + baseMax) / 2;
+  const weight = Math.min(1, Math.max(0, (totalStats - 3000) / 3000));
+  return baseMin * (1 - weight) + avgBase * weight;
+}
 
 function App() {
   const [result, setResult] = useState(null);
   const [formData, setFormData] = useState({
     minDamage: "",
     maxDamage: "",
-    gmLevel: "",
-    percentPerLevel: "",
     attackPower: "",
     soulBadge: "",
     crit: "",
     critDmg: "",
+    accuracy: "",
+    debuffResist: "",
   });
+
+  // Define book types and their values
+  const bookTypes = [
+    {
+      id: "green",
+      name: "Green Book",
+      level: 1,
+      percent: 1.9,
+      count: 0,
+      color: "green",
+    },
+    {
+      id: "blue",
+      name: "Blue Book",
+      level: 2,
+      percent: 3.8,
+      count: 0,
+      color: "blue",
+    },
+    {
+      id: "purple",
+      name: "Purple Book",
+      level: 6,
+      percent: 11.4,
+      count: 0,
+      color: "purple",
+    },
+    {
+      id: "legendary",
+      name: "Legendary Book",
+      level: 18,
+      percent: 33,
+      count: 0,
+      color: "yellow",
+    },
+  ];
+
+  const [books, setBooks] = useState(bookTypes);
+
+  // Calculate total GM level and percent from books
+  const calculateGMTotals = () => {
+    let totalLevel = 0;
+    let totalPercent = 0;
+
+    books.forEach((book) => {
+      totalLevel += book.level * book.count;
+      totalPercent += book.percent * book.count;
+    });
+
+    return { gmLevel: totalLevel, percentPerLevel: totalPercent };
+  };
 
   const handleChange = (e) => {
     const { id, value } = e.target;
@@ -21,77 +106,99 @@ function App() {
     }));
   };
 
+  const handleBookCountChange = (bookId, change) => {
+    setBooks((prevBooks) =>
+      prevBooks.map((book) =>
+        book.id === bookId
+          ? { ...book, count: Math.max(0, book.count + change) }
+          : book
+      )
+    );
+  };
+
   const calculateDamage = () => {
-    const {
-      minDamage,
-      maxDamage,
-      gmLevel,
-      percentPerLevel,
-      attackPower,
-      soulBadge,
-      crit,
-      critDmg,
-    } = formData;
+    const { minDamage, maxDamage, attackPower, soulBadge, crit, critDmg } =
+      formData;
+
+    // Get GM values from books
+    const { gmLevel, percentPerLevel } = calculateGMTotals();
 
     const min = parseFloat(minDamage);
     const max = parseFloat(maxDamage);
     const level = parseFloat(gmLevel) || 0;
     const percent = parseFloat(percentPerLevel) || 0;
     const ap = parseFloat(attackPower);
-    const soulBadgeValue = parseFloat(soulBadge) || 0;
+    const badgePercent = parseFloat(soulBadge) || 0;
     const critValue = parseFloat(crit);
     const critDmgValue = parseFloat(critDmg);
 
-    if (
-      isNaN(min) ||
-      isNaN(max) ||
-      isNaN(ap) ||
-      isNaN(critValue) ||
-      isNaN(critDmgValue)
-    ) {
+    if (isNaN(critValue) || isNaN(critDmgValue)) {
       setResult({
         error: true,
-        message: "⚠️ Please fill in all required fields.",
+        message: "⚠️ Please enter both Critical and Crit Damage points.",
       });
       return;
     }
 
-    // Grandmaster multiplier
-    const multiplier = 1 + (percent / 100) * level;
+    if (isNaN(min) || isNaN(max) || isNaN(ap)) {
+      const critRate = calculateCritRate(critValue);
+      const critMultiplier = calculateCritMultiplier(critDmgValue);
+
+      setResult({
+        error: false,
+        critRateCalculated: `📈 Crit Rate: ${critRate.toFixed(2)}%`,
+        critMultiplierCalculated: `🔥 Crit Damage Multiplier: ${critMultiplier.toFixed(
+          2
+        )}%`,
+        message: "ℹ️ Enter full stats to calculate full damage output.",
+      });
+      return;
+    }
+
+    // --- Base Damage with GM Bonuses ---
+    const gmMultiplier = 1 + (percent / 100) * level;
     const effectivePercent = percent * 0.728;
     const bonusMin = level > 0 ? min * (effectivePercent / 100) * level : 0;
     const bonusMax = level > 0 ? max * (effectivePercent / 100) * level : 0;
     const baseMin = min + bonusMin;
     const baseMax = max + bonusMax;
 
-    // Non-crit
-    const badgeBonus = ap * (soulBadgeValue / 100);
+    // --- Badge Bonus ---
+    const badgeBonus = ap * (badgePercent / 100);
+
+    // --- Normal Hit ---
     const normalMin = (baseMin + ap + badgeBonus) * 0.88;
     const normalMax = (baseMax + ap + badgeBonus) * 0.88;
     const avgNormal = (normalMin + normalMax) / 2;
 
-    // Crit multiplier fix
+    // --- Crit Rate Calculation ---
     const critRate = (96.98979 * critValue) / (1124.069 + critValue);
+
+    // --- Crit Multiplier (correct formula) ---
     const critMultiplier =
       (290.8 * critDmgValue) / (2102.36 + critDmgValue) + 125;
+
+    // --- Crit Scale (bonus scaling for higher crit%) ---
     const critScale =
       1 + Math.min(0.1, Math.max(0, (critMultiplier - 150) / 500));
 
-    // Use avg base, then calculate crit-damaged base only (NOT ap/badge!)
+    // --- Anchor Base (used for consistent crit output) ---
     const avgBase = (baseMin + baseMax) / 2;
     const totalStats = ap + critValue + critDmgValue;
     const weight = Math.min(1, Math.max(0, (totalStats - 3000) / 3000));
     const anchorBase = baseMin * (1 - weight) + avgBase * weight;
 
-    // ✅ Correct crit logic:
-    // Normalize critMultiplier based on 125% base expectation
+    // --- Final Base including all sources ---
     const baseNormal = anchorBase + ap + badgeBonus;
-    const baseCrit = baseNormal * (critMultiplier / 155) * critScale;
 
+    // ✅ FINAL Crit Damage Calc
+    // Normalize critMultiplier to original formula (around 180%)
+    const baseCrit = baseNormal * (critMultiplier / 155) * critScale;
     const critMin = baseCrit * 0.985 * 1.015;
     const critMax = baseCrit * 1.015 * 1.015;
     const avgCrit = (critMin + critMax) / 2;
 
+    // --- Output Results ---
     setResult({
       error: false,
       baseWithoutGM: `🟫 Base Damage (no GM): ${min.toFixed(0)} – ${max.toFixed(
@@ -115,6 +222,9 @@ function App() {
       critScaleCalculated: `🛠 Crit Scale: ${critScale.toFixed(3)}`,
     });
   };
+
+  // Get GM totals for display
+  const { gmLevel, percentPerLevel } = calculateGMTotals();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-teal-900 py-8 px-4 flex flex-col items-center justify-center">
@@ -166,18 +276,12 @@ function App() {
                   <li>
                     <strong> If you want to test additional books</strong>:{" "}
                     <br />
-                    For example, if you already have a skill with Grandmaster
-                    level 10 and 19% (meaning you have 5 blue books already),
-                    you leave Grandmaster fields empty. But if you want to test
-                    buying 2 extra books to see the damage with 7 books total,
-                    add "4" in GM level and "7.60" in percent fields to show the
-                    damage increase from those additional 2 books. <br />
-                    This will show you how much more damage you’d gain from
-                    those extra 2 books only (4 levels × 1.90%).
+                    Select the number of additional books you want to test using
+                    the book selector interface.
                   </li>
                   <li>
-                    <strong>If you have no skill books:</strong> Add the
-                    Grandmaster level and the percentage it adds.
+                    <strong>If you have no skill books:</strong> Leave all book
+                    counters at zero.
                   </li>
                 </ul>
               </li>
@@ -255,45 +359,55 @@ function App() {
               </div>
             </div>
 
-            {/* Grandmaster Skill Section */}
+            {/* Grandmaster Skill Section with Book Selection UI */}
             <div className="bg-black/40 p-5 rounded-lg border-l-4 border-cyan-600">
               <h2 className="text-cyan-400 text-lg uppercase tracking-wide flex items-center mb-4 font-semibold">
                 <span className="w-2 h-2 bg-cyan-400 rounded-full mr-2"></span>
                 Grandmaster Skill
               </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label
-                    htmlFor="gmLevel"
-                    className="block text-cyan-200 font-medium mb-1 text-sm hover:text-cyan-400 transition-colors"
+
+              {/* Book selection interface */}
+              <div className="space-y-3">
+                {books.map((book) => (
+                  <div
+                    key={book.id}
+                    className={`flex items-center p-2 rounded bg-${book.color}-900/30 border border-${book.color}-500/30`}
                   >
-                    {" Grandmaster Level (Optional):"}
-                  </label>
-                  <input
-                    type="number"
-                    id="gmLevel"
-                    placeholder="e.g. 1"
-                    className="no-spinner w-full p-3 bg-gray-900/90 border border-cyan-500/30 rounded-lg text-white outline-none focus:border-cyan-500/80 focus:shadow-lg focus:shadow-cyan-500/40 transition-all"
-                    value={formData.gmLevel}
-                    onChange={handleChange}
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="percentPerLevel"
-                    className="block text-cyan-200 font-medium mb-1 text-sm hover:text-cyan-400 transition-colors"
-                  >
-                    {"Damage % per Level (Optional):"}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    id="percentPerLevel"
-                    placeholder="e.g. 3.90"
-                    className="no-spinner w-full p-3 bg-gray-900/90 border border-cyan-500/30 rounded-lg text-white outline-none focus:border-cyan-500/80 focus:shadow-lg focus:shadow-cyan-500/40 transition-all"
-                    value={formData.percentPerLevel}
-                    onChange={handleChange}
-                  />
+                    <div className={`text-${book.color}-300 font-medium w-24`}>
+                      {book.name}
+                    </div>
+                    <div className="flex items-center ml-auto">
+                      <button
+                        onClick={() => handleBookCountChange(book.id, -1)}
+                        className={`flex items-center justify-center w-8 h-8 rounded-full bg-gray-900 text-${book.color}-300 hover:bg-${book.color}-800 transition-colors cursor-pointer`}
+                      >
+                        -
+                      </button>
+                      <span className="mx-3 text-white w-4 text-center">
+                        {book.count}
+                      </span>
+                      <button
+                        onClick={() => handleBookCountChange(book.id, 1)}
+                        className={`flex items-center justify-center w-8 h-8 rounded-full bg-gray-900 text-${book.color}-300 hover:bg-${book.color}-800 transition-colors cursor-pointer`}
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Summary display */}
+                <div className="mt-4 p-3 bg-gray-900/40 rounded-lg border border-cyan-500/20">
+                  <div className="flex justify-between">
+                    <span className="text-cyan-200">Total GM Level:</span>
+                    <span className="text-white font-medium">{gmLevel}</span>
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className="text-cyan-200">Total Percent:</span>
+                    <span className="text-white font-medium">
+                      {percentPerLevel.toFixed(2)}%
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -302,13 +416,14 @@ function App() {
           {/* Right Column */}
           <div className="space-y-6">
             {/* Character Stats Section */}
+            {/* Character Stats Section */}
             <div className="bg-black/40 p-5 rounded-lg border-l-4 border-cyan-600">
               <h2 className="text-cyan-400 text-lg uppercase tracking-wide flex items-center mb-4 font-semibold">
                 <span className="w-2 h-2 bg-cyan-400 rounded-full mr-2"></span>
                 Character Stats
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                <div>
+                <div className="flex flex-col h-full">
                   <label
                     htmlFor="attackPower"
                     className="block text-cyan-200 font-medium mb-1 text-sm hover:text-cyan-400 transition-colors"
@@ -319,12 +434,12 @@ function App() {
                     type="number"
                     id="attackPower"
                     placeholder="e.g. 700"
-                    className="no-spinner w-full p-3 bg-gray-900/90 border border-cyan-500/30 rounded-lg text-white outline-none focus:border-cyan-500/80 focus:shadow-lg focus:shadow-cyan-500/40 transition-all"
+                    className="no-spinner w-full p-3 mt-auto bg-gray-900/90 border border-cyan-500/30 rounded-lg text-white outline-none focus:border-cyan-500/80 focus:shadow-lg focus:shadow-cyan-500/40 transition-all"
                     value={formData.attackPower}
                     onChange={handleChange}
                   />
                 </div>
-                <div>
+                <div className="flex flex-col h-full">
                   <label
                     htmlFor="soulBadge"
                     className="block text-cyan-200 font-medium mb-1 text-sm hover:text-cyan-400 transition-colors"
@@ -336,53 +451,26 @@ function App() {
                     step="0.01"
                     id="soulBadge"
                     placeholder="e.g. 55"
-                    className="no-spinner w-full p-3 bg-gray-900/90 border border-cyan-500/30 rounded-lg text-white outline-none focus:border-cyan-500/80 focus:shadow-lg focus:shadow-cyan-500/40 transition-all"
+                    className="no-spinner w-full p-3 mt-auto bg-gray-900/90 border border-cyan-500/30 rounded-lg text-white outline-none focus:border-cyan-500/80 focus:shadow-lg focus:shadow-cyan-500/40 transition-all"
                     value={formData.soulBadge}
                     onChange={handleChange}
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label
-                    htmlFor="crit"
-                    className="block text-cyan-200 font-medium mb-1 text-sm hover:text-cyan-400 transition-colors"
-                  >
-                    Critical (points):
-                  </label>
-                  <input
-                    type="number"
-                    id="crit"
-                    placeholder="e.g. 1711"
-                    className="no-spinner w-full p-3 bg-gray-900/90 border border-cyan-500/30 rounded-lg text-white outline-none focus:border-cyan-500/80 focus:shadow-lg focus:shadow-cyan-500/40 transition-all"
-                    value={formData.crit}
-                    onChange={handleChange}
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="critDmg"
-                    className="block text-cyan-200 font-medium mb-1 text-sm hover:text-cyan-400 transition-colors"
-                  >
-                    Critical Damage (points):
-                  </label>
-                  <input
-                    type="number"
-                    id="critDmg"
-                    placeholder="e.g. 1117"
-                    className="no-spinner w-full p-3 bg-gray-900/90 border border-cyan-500/30 rounded-lg text-white outline-none focus:border-cyan-500/80 focus:shadow-lg focus:shadow-cyan-500/40 transition-all"
-                    value={formData.critDmg}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
             </div>
+            <CombatStatsOverview
+              crit={formData.crit}
+              critDmg={formData.critDmg}
+              accuracy={formData.accuracy}
+              debuffResist={formData.debuffResist}
+              onChange={handleChange}
+            />
           </div>
         </div>
 
         <button
           onClick={calculateDamage}
-          className="w-full mt-6 py-4 px-6 bg-gradient-to-r from-cyan-600 to-cyan-400 text-white font-bold text-lg tracking-wide uppercase rounded-lg hover:from-cyan-500 hover:to-cyan-300 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/40 transform hover:-translate-y-1 active:translate-y-0"
+          className="w-full mt-6 py-4 px-6 bg-gradient-to-r from-cyan-600 to-cyan-400 text-white font-bold text-lg tracking-wide uppercase rounded-lg hover:from-cyan-500 hover:to-cyan-300 transition-all duration-300 hover:shadow-lg hover:shadow-cyan-500/40 transform hover:-translate-y-1 active:translate-y-0 cursor-pointer"
         >
           Calculate
         </button>
