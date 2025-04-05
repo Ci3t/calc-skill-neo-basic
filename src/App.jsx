@@ -115,6 +115,11 @@ function App() {
       formData;
     const { gmLevel, percentPerLevel } = calculateGMTotals();
 
+    // Only used for display
+    const currentGM = parseInt(formData.currentGMLevel) || 0;
+    const visualTotalLevel = gmLevel + currentGM;
+    const visualTotalPercent = percentPerLevel + currentGM * 1.9;
+
     const min = parseFloat(minDamage);
     const max = parseFloat(maxDamage);
     const ap = parseFloat(attackPower);
@@ -145,6 +150,7 @@ function App() {
       return;
     }
 
+    // 💡 Only additional GM books affect damage
     const effectivePercent = percentPerLevel * 0.728;
     const bonusMin = min * (effectivePercent / 100) * gmLevel;
     const bonusMax = max * (effectivePercent / 100) * gmLevel;
@@ -190,8 +196,12 @@ function App() {
         2
       )}%`,
       critScaleCalculated: `🛠 Crit Scale: ${critScale.toFixed(3)}`,
+      // Optional visual info
+      visualTotalLevel,
+      visualTotalPercent,
     });
   };
+
   // Get GM totals for display
   const { gmLevel, percentPerLevel } = calculateGMTotals();
 
@@ -397,7 +407,7 @@ function App() {
                     </div>
                   ))}
 
-                  {/* Summary display */}
+                  {/* Corrected Additional GM Summary (Books only) */}
                   <div className="mt-4 p-3 bg-gray-900/40 rounded-lg border border-cyan-500/20">
                     <div className="flex justify-between">
                       <span className="text-cyan-200">
@@ -411,10 +421,24 @@ function App() {
                         {percentPerLevel.toFixed(2)}%
                       </span>
                     </div>
-                    <div className="flex justify-between mt-1 text-yellow-300 font-semibold">
+                  </div>
+
+                  {/* Visual Total GM Summary (GM level + books) */}
+                  <div className="mt-2 p-3 bg-gray-800/40 rounded-lg border border-yellow-500/20">
+                    <div className="flex justify-between text-yellow-300 font-semibold">
                       <span>Total GM Level:</span>
                       <span>
-                        {(parseInt(formData.currentGMLevel) || 0) + gmLevel}
+                        {gmLevel + (parseInt(formData.currentGMLevel) || 0)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-yellow-300 font-semibold mt-1">
+                      <span>Total Percent:</span>
+                      <span>
+                        {(
+                          percentPerLevel +
+                          (parseInt(formData.currentGMLevel) || 0) * 1.9
+                        ).toFixed(2)}
+                        %
                       </span>
                     </div>
                   </div>
