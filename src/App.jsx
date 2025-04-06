@@ -22,6 +22,13 @@ function calculateAnchorBase(baseMin, baseMax, totalStats) {
   const weight = Math.min(1, Math.max(0, (totalStats - 3000) / 3000));
   return baseMin * (1 - weight) + avgBase * weight;
 }
+function convertSkillDamage(min, max, oldMultiplier, newMultiplier) {
+  const factor = newMultiplier / oldMultiplier;
+  return {
+    newMin: (parseFloat(min) || 0) * factor,
+    newMax: (parseFloat(max) || 0) * factor,
+  };
+}
 
 function App() {
   const [result, setResult] = useState(null);
@@ -35,6 +42,8 @@ function App() {
     accuracy: "",
     debuffResist: "",
     currentGMLevel: 0, // purely visual
+    currentApMod: "",
+    newApMod: "",
   });
 
   const bookTypes = [
@@ -108,6 +117,20 @@ function App() {
           : book
       )
     );
+  };
+  const handleTierConvert = () => {
+    const { minDamage, maxDamage, currentApMod, newApMod } = formData;
+    const { newMin, newMax } = convertSkillDamage(
+      minDamage,
+      maxDamage,
+      currentApMod,
+      newApMod
+    );
+    setFormData((prev) => ({
+      ...prev,
+      minDamage: newMin.toFixed(2),
+      maxDamage: newMax.toFixed(2),
+    }));
   };
 
   const calculateDamage = () => {
@@ -328,6 +351,53 @@ function App() {
                       onChange={handleChange}
                     />
                   </div>
+                </div>
+                {/* AP Modifier Conversion Section */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <label
+                      htmlFor="currentApMod"
+                      className="block text-cyan-200 font-medium mb-1 text-sm hover:text-cyan-400 transition-colors"
+                    >
+                      Current AP Modifier:
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      id="currentApMod"
+                      placeholder="e.g. 2.80"
+                      className="no-spinner w-full p-3 bg-gray-900/90 border border-cyan-500/30 rounded-lg text-white outline-none focus:border-cyan-500/80 focus:shadow-lg focus:shadow-cyan-500/40 transition-all"
+                      value={formData.currentApMod}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="newApMod"
+                      className="block text-cyan-200 font-medium mb-1 text-sm hover:text-cyan-400 transition-colors"
+                    >
+                      New AP Modifier:
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      id="newApMod"
+                      placeholder="e.g. 3.30"
+                      className="no-spinner w-full p-3 bg-gray-900/90 border border-cyan-500/30 rounded-lg text-white outline-none focus:border-cyan-500/80 focus:shadow-lg focus:shadow-cyan-500/40 transition-all"
+                      value={formData.newApMod}
+                      onChange={handleChange}
+                    />
+                  </div>
+                </div>
+
+                {/* Convert Button */}
+                <div className="mt-4">
+                  <button
+                    onClick={handleTierConvert}
+                    className="w-full bg-gradient-to-r cursor-pointer from-purple-700 to-purple-500 hover:from-purple-600 hover:to-purple-400 text-white font-bold py-3 px-6 rounded-lg transition-all shadow-lg hover:shadow-purple-700/40"
+                  >
+                    Convert Skill Tier
+                  </button>
                 </div>
 
                 {/* Current GM Level Selector */}
