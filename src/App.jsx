@@ -1,5 +1,109 @@
 import { useState } from "react";
 import CombatStatsOverview from "./CombatStatsOverview";
+
+const GM_PERCENT_LOOKUP = [
+  0.0,
+  1.9,
+  3.8,
+  5.7,
+  7.6,
+  9.5,
+  11.4,
+  13.3,
+  15.2,
+  17.1,
+  19.0,
+  20.9,
+  22.8,
+  24.7,
+  26.6,
+  28.5,
+  30.0,
+  31.5,
+  33.0,
+  34.5,
+  36.0,
+  37.5,
+  39.0,
+  40.5,
+  42.0,
+  43.5,
+  45.0,
+  46.5,
+  48.0,
+  49.5,
+  51.0,
+  52.5,
+  54.0,
+  55.5,
+  57.0,
+  58.5,
+  59.6,
+  60.7,
+  61.8,
+  62.9,
+  64.0,
+  65.1,
+  66.2,
+  67.3,
+  68.4,
+  69.5,
+  70.6,
+  71.7,
+  72.8,
+  73.9,
+  75.0,
+  76.1,
+  77.2,
+  78.3,
+  79.4,
+  80.5,
+  81.6,
+  82.7,
+  83.8,
+  84.9,
+  86.0,
+  87.1,
+  88.2,
+  89.3,
+  90.4,
+  91.5,
+  92.6,
+  93.7,
+  94.8,
+  95.9,
+  97.0,
+  98.1,
+  99.2,
+  100.3,
+  101.4,
+  102.5,
+  103.6,
+  104.7,
+  105.8,
+  106.9,
+  108.0,
+  109.1,
+  110.2,
+  111.3,
+  112.4,
+  113.5,
+  114.6,
+  115.7,
+  116.8,
+  117.9,
+  119.0,
+  120.1,
+  121.2,
+  122.3,
+  123.4,
+  124.5,
+  125.6,
+  126.7,
+  127.8,
+  128.9,
+  130.0, // up to 130 GM levels, you can add more
+];
 // --- Crit Multiplier (fixed) ---
 function calculateCritMultiplier(cdmgPoints) {
   return (180 * cdmgPoints) / (1800 + cdmgPoints) + 125;
@@ -129,12 +233,12 @@ function App() {
 
   const calculateGMTotals = () => {
     let gmLevel = 0;
-    let percentPerLevel = 0;
 
     books.forEach((book) => {
       gmLevel += book.level * book.count;
-      percentPerLevel += book.percent * book.count;
     });
+
+    const percentPerLevel = GM_PERCENT_LOOKUP[gmLevel] ?? 0; // fallback to 0 if undefined
 
     return { gmLevel, percentPerLevel };
   };
@@ -171,8 +275,8 @@ function App() {
     );
     setFormData((prev) => ({
       ...prev,
-      minDamage: newMin.toFixed(2),
-      maxDamage: newMax.toFixed(2),
+      minDamage: newMin.toFixed(0),
+      maxDamage: newMax.toFixed(0),
     }));
   };
 
@@ -208,48 +312,64 @@ function App() {
     // Calculate Crit Damage using new universal scaling
     const baseAvg = (min + max) / 2;
     const badgeMult = badgePercent / 100;
+    // Total character stats for tier scaling
     const totalStats = ap + critDmgValue;
 
-    // Dynamic scale (smoother tier system)
+    // Smooth scaling factor based on stat tier
     const scaleFactor = Math.min(1.2, Math.max(0.85, totalStats / 4800));
     const apScale = 0.62 + scaleFactor * 0.3;
     const baseScale = 0.88 + scaleFactor * 0.1;
     const critBase = 1.27 + scaleFactor * 0.15;
     const critScale = (0.00028 + scaleFactor * 0.00004) * balance;
 
-    // Apply GM bonus to base average first!
-    // Calculate GM-adjusted base average
-    const gmPercentBonus = (percentPerLevel + currentGM * 1.9) * 0.699;
+    // 🎯 Only use books for damage calculation (currentGM is visual only)
+    const gmPercentFromTable = GM_PERCENT_LOOKUP[gmLevel] ?? gmLevel * 1.9;
+    const gmPercentBonus = gmPercentFromTable * 0.728; // damage scale
+
+    // Adjusted base average
     const adjustedBaseAvg = baseAvg + (baseAvg * gmPercentBonus) / 100;
 
-    // Now use it
+    // Base + AP + Badge
     const totalBase =
       adjustedBaseAvg * baseScale + ap * apScale + ap * badgeMult;
 
+    // Crit calculation
     const critMultiplier = critBase + critDmgValue * critScale;
     const avgCrit = totalBase * critMultiplier * (0.95 * balance);
 
+    // Variance
     const variance = avgCrit * 0.04;
-
     const critMin = avgCrit - variance;
     const critMax = avgCrit + variance;
 
-    // For display
-    const critRate = (96.98979 * critValue) / (1124.069 + critValue);
+    // 🎯 Show UI base damage (min/max) with full GM effect (books + currentGM — for display only)
+    const totalGMPercent = percentPerLevel + currentGM * 1.9;
+    const gmDisplayBonus = (totalGMPercent * 0.728) / 100;
+
+    const adjustedBaseMin = min + min * gmDisplayBonus;
+    const adjustedBaseMax = max + max * gmDisplayBonus;
+    const avgNormalHit = totalBase.toFixed(2);
+    const normalMin = (totalBase * 0.97).toFixed(2);
+    const normalMax = (totalBase * 1.03).toFixed(2);
 
     setResult({
       error: false,
       baseWithoutGM: `🟫 Base Damage (no GM): ${min.toFixed(0)} – ${max.toFixed(
         0
       )}`,
+      baseWithGM: `🟪 Base Damage (with GM): ${adjustedBaseMin.toFixed(
+        0
+      )} – ${adjustedBaseMax.toFixed(0)}`,
+      normalDamage: `🔸 Non-Crit Damage: ${normalMin} – ${normalMax}`,
+
       critDamage: `🔹 Crit Range: ${critMin.toFixed(2)} – ${critMax.toFixed(
         2
       )}`,
+      avgNormalHit: `⚪ Avg Hit (non-crit): ${avgNormalHit}`,
       avgCritHit: `💥 Avg Crit Damage: ${avgCrit.toFixed(2)}`,
-      critRateCalculated: `📈 Crit Rate: ${critRate.toFixed(2)}%`,
+      // critRateCalculated: `📈 Crit Rate: ${critRate.toFixed(2)}%`,
       visualTotalLevel: gmLevel + currentGM,
       visualTotalPercent: percentPerLevel + currentGM * 1.9,
-      baseWithGM: `🟩 Base Damage (with GM): ${adjustedBaseAvg.toFixed(0)} avg`,
     });
   };
 
@@ -459,7 +579,7 @@ function App() {
                     <div className="ml-4">
                       <span className="text-purple-200">GM Percent: </span>
                       <span className="text-white font-medium">
-                        {currentGMPercent.toFixed(2)}%
+                        {GM_PERCENT_LOOKUP[formData.currentGMLevel] || 0}%
                       </span>
                     </div>
                   </div>
@@ -604,7 +724,7 @@ function App() {
                   <input
                     type="range"
                     id="balanceTweak"
-                    min="0.90"
+                    min="0.50"
                     max="1.50"
                     step="0.01"
                     value={formData.balanceTweak}
