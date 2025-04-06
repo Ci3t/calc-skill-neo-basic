@@ -1,14 +1,13 @@
 import { useState } from "react";
 import CombatStatsOverview from "./CombatStatsOverview";
-
 // --- Crit Multiplier (fixed) ---
 function calculateCritMultiplier(cdmgPoints) {
-  return (290.8 * cdmgPoints) / (2102.36 + cdmgPoints) + 125;
+  return (180 * cdmgPoints) / (1800 + cdmgPoints) + 125;
 }
 
 // --- Crit Scale (based on crit multiplier) ---
 function calculateCritScale(multiplier) {
-  return 1 + Math.min(0.1, Math.max(0, (multiplier - 150) / 500));
+  return 1 + Math.min(0.07, (multiplier - 150) / 600);
 }
 
 // --- Crit Rate (based on crit points) ---
@@ -19,9 +18,50 @@ function calculateCritRate(critPoints) {
 // --- Weighted average base (used for crit smoothing) ---
 function calculateAnchorBase(baseMin, baseMax, totalStats) {
   const avgBase = (baseMin + baseMax) / 2;
-  const weight = Math.min(1, Math.max(0, (totalStats - 3000) / 3000));
+  const weight = Math.min(1, Math.max(0, (totalStats - 2500) / 3500));
   return baseMin * (1 - weight) + avgBase * weight;
 }
+function calculateUniversalCrit(inputData) {
+  const {
+    minDamage = 0,
+    maxDamage = 0,
+    attackPower = 0,
+    soulBadge = 0,
+    critDmg = 0,
+    crit = 0,
+  } = inputData || {};
+
+  const baseAvg = (parseFloat(minDamage) + parseFloat(maxDamage)) / 2;
+  const ap = parseFloat(attackPower);
+  const badgeMult = parseFloat(soulBadge) / 100;
+  const critDmgPoints = parseFloat(critDmg);
+
+  const totalStats = ap + critDmgPoints;
+
+  // 📈 Smoother tiering (no jumps)
+  const scaleFactor = Math.min(1.2, Math.max(0.85, totalStats / 4800)); // floats between ~0.85 – 1.2
+
+  const apScale = 0.62 + scaleFactor * 0.3;
+  const baseScale = 0.88 + scaleFactor * 0.1;
+  const critBase = 1.27 + scaleFactor * 0.15;
+  const critScale = 0.00028 + scaleFactor * 0.00004;
+
+  const totalBase = baseAvg * baseScale + ap * apScale + ap * badgeMult;
+  const critMult = critBase + critDmgPoints * critScale;
+  const avgCrit = totalBase * critMult * 0.95;
+
+  const variance = avgCrit * 0.04;
+  const critMin = avgCrit - variance;
+  const critMax = avgCrit + variance;
+
+  return {
+    average: avgCrit.toFixed(2),
+    min: critMin.toFixed(2),
+    max: critMax.toFixed(2),
+  };
+}
+
+// --- AP Multiplier Conversion ---
 function convertSkillDamage(min, max, oldMultiplier, newMultiplier) {
   const factor = newMultiplier / oldMultiplier;
   return {
@@ -44,6 +84,8 @@ function App() {
     currentGMLevel: 0, // purely visual
     currentApMod: "",
     newApMod: "",
+    skillApMultiplier: "1.05",
+    balanceTweak: "1.00", // balance slider, defaults to 1
   });
 
   const bookTypes = [
@@ -118,6 +160,7 @@ function App() {
       )
     );
   };
+
   const handleTierConvert = () => {
     const { minDamage, maxDamage, currentApMod, newApMod } = formData;
     const { newMin, newMax } = convertSkillDamage(
@@ -136,12 +179,9 @@ function App() {
   const calculateDamage = () => {
     const { minDamage, maxDamage, attackPower, soulBadge, crit, critDmg } =
       formData;
-    const { gmLevel, percentPerLevel } = calculateGMTotals();
 
-    // Only used for display
+    const { gmLevel, percentPerLevel } = calculateGMTotals();
     const currentGM = parseInt(formData.currentGMLevel) || 0;
-    const visualTotalLevel = gmLevel + currentGM;
-    const visualTotalPercent = percentPerLevel + currentGM * 1.9;
 
     const min = parseFloat(minDamage);
     const max = parseFloat(maxDamage);
@@ -149,79 +189,67 @@ function App() {
     const badgePercent = parseFloat(soulBadge) || 0;
     const critValue = parseFloat(crit);
     const critDmgValue = parseFloat(critDmg);
+    const balance = parseFloat(formData.balanceTweak) || 1.0;
 
-    if (isNaN(critValue) || isNaN(critDmgValue)) {
+    if (
+      isNaN(min) ||
+      isNaN(max) ||
+      isNaN(ap) ||
+      isNaN(critValue) ||
+      isNaN(critDmgValue)
+    ) {
       setResult({
         error: true,
-        message: "⚠️ Please enter both Critical and Crit Damage points.",
+        message: "⚠️ Please fill in all required fields.",
       });
       return;
     }
 
-    if (isNaN(min) || isNaN(max) || isNaN(ap)) {
-      const critRate = calculateCritRate(critValue);
-      const critMultiplier = calculateCritMultiplier(critDmgValue);
+    // Calculate Crit Damage using new universal scaling
+    const baseAvg = (min + max) / 2;
+    const badgeMult = badgePercent / 100;
+    const totalStats = ap + critDmgValue;
 
-      setResult({
-        error: false,
-        critRateCalculated: `📈 Crit Rate: ${critRate.toFixed(2)}%`,
-        critMultiplierCalculated: `🔥 Crit Damage Multiplier: ${critMultiplier.toFixed(
-          2
-        )}%`,
-        message: "ℹ️ Enter full stats to calculate full damage output.",
-      });
-      return;
-    }
+    // Dynamic scale (smoother tier system)
+    const scaleFactor = Math.min(1.2, Math.max(0.85, totalStats / 4800));
+    const apScale = 0.62 + scaleFactor * 0.3;
+    const baseScale = 0.88 + scaleFactor * 0.1;
+    const critBase = 1.27 + scaleFactor * 0.15;
+    const critScale = (0.00028 + scaleFactor * 0.00004) * balance;
 
-    // 💡 Only additional GM books affect damage
-    const effectivePercent = percentPerLevel * 0.728;
-    const bonusMin = min * (effectivePercent / 100) * gmLevel;
-    const bonusMax = max * (effectivePercent / 100) * gmLevel;
-    const baseMin = min + bonusMin;
-    const baseMax = max + bonusMax;
+    // Apply GM bonus to base average first!
+    // Calculate GM-adjusted base average
+    const gmPercentBonus = (percentPerLevel + currentGM * 1.9) * 0.699;
+    const adjustedBaseAvg = baseAvg + (baseAvg * gmPercentBonus) / 100;
 
-    const badgeBonus = ap * (badgePercent / 100);
-    const normalMin = (baseMin + ap + badgeBonus) * 0.88;
-    const normalMax = (baseMax + ap + badgeBonus) * 0.88;
-    const avgNormal = (normalMin + normalMax) / 2;
+    // Now use it
+    const totalBase =
+      adjustedBaseAvg * baseScale + ap * apScale + ap * badgeMult;
 
-    const critRate = calculateCritRate(critValue);
-    const critMultiplier = calculateCritMultiplier(critDmgValue);
-    const critScale = calculateCritScale(critMultiplier);
+    const critMultiplier = critBase + critDmgValue * critScale;
+    const avgCrit = totalBase * critMultiplier * (0.95 * balance);
 
-    const totalStats = ap + critValue + critDmgValue;
-    const anchorBase = calculateAnchorBase(baseMin, baseMax, totalStats);
-    const baseNormal = anchorBase + ap + badgeBonus;
+    const variance = avgCrit * 0.04;
 
-    const baseCrit = baseNormal * (critMultiplier / 155) * critScale;
-    const critMin = baseCrit * 0.985 * 1.015;
-    const critMax = baseCrit * 1.015 * 1.015;
-    const avgCrit = (critMin + critMax) / 2;
+    const critMin = avgCrit - variance;
+    const critMax = avgCrit + variance;
+
+    // For display
+    const critRate = (96.98979 * critValue) / (1124.069 + critValue);
 
     setResult({
       error: false,
       baseWithoutGM: `🟫 Base Damage (no GM): ${min.toFixed(0)} – ${max.toFixed(
         0
       )}`,
-      baseWithGM: `🟪 Base Damage (with GM): ${baseMin.toFixed(
-        2
-      )} – ${baseMax.toFixed(2)}`,
-      normalDamage: `🔸 Non-Crit Damage: ${normalMin.toFixed(
-        2
-      )} – ${normalMax.toFixed(2)}`,
-      critDamage: `🔹 Crit Damage: ${critMin.toFixed(2)} – ${critMax.toFixed(
+      critDamage: `🔹 Crit Range: ${critMin.toFixed(2)} – ${critMax.toFixed(
         2
       )}`,
-      avgNormalHit: `⭐ Avg Hit (non-crit): ${avgNormal.toFixed(2)}`,
-      avgCritHit: `💥 Avg Hit (crit): ${avgCrit.toFixed(2)}`,
+      avgCritHit: `💥 Avg Crit Damage: ${avgCrit.toFixed(2)}`,
       critRateCalculated: `📈 Crit Rate: ${critRate.toFixed(2)}%`,
-      critMultiplierCalculated: `🔥 Crit Damage Multiplier: ${critMultiplier.toFixed(
-        2
-      )}%`,
-      critScaleCalculated: `🛠 Crit Scale: ${critScale.toFixed(3)}`,
-      // Optional visual info
-      visualTotalLevel,
-      visualTotalPercent,
+      visualTotalLevel: gmLevel + currentGM,
+      visualTotalPercent: percentPerLevel + currentGM * 1.9,
+      baseWithGM: `🟩 Base Damage (with GM): ${adjustedBaseAvg.toFixed(0)} avg`,
     });
   };
 
@@ -520,7 +548,6 @@ function App() {
           {/* Right Column */}
           <div className="space-y-6">
             {/* Character Stats Section */}
-            {/* Character Stats Section */}
             <div className="bg-black/40 p-5 rounded-lg border-l-4 border-cyan-600">
               <h2 className="text-cyan-400 text-lg uppercase tracking-wide flex items-center mb-4 font-semibold">
                 <span className="w-2 h-2 bg-cyan-400 rounded-full mr-2"></span>
@@ -559,6 +586,37 @@ function App() {
                     value={formData.soulBadge}
                     onChange={handleChange}
                   />
+                </div>
+              </div>
+              {/* Balance Tweak Slider */}
+              <div className="bg-black/40 p-5 rounded-lg border-l-4 border-yellow-600 mt-4">
+                <h2 className="text-yellow-400 text-lg uppercase tracking-wide mb-4 font-semibold">
+                  Balance Tweak (Dev Tool)
+                </h2>
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="balanceTweak"
+                    className="text-yellow-200 text-sm"
+                  >
+                    Tweak global damage scaling (affects crit scale + final
+                    multiplier)
+                  </label>
+                  <input
+                    type="range"
+                    id="balanceTweak"
+                    min="0.90"
+                    max="1.50"
+                    step="0.01"
+                    value={formData.balanceTweak}
+                    onChange={handleChange}
+                    className="w-full"
+                  />
+                  <span className="text-white text-sm">
+                    Balance Factor:{" "}
+                    <strong className="text-yellow-300">
+                      {formData.balanceTweak}
+                    </strong>
+                  </span>
                 </div>
               </div>
             </div>
