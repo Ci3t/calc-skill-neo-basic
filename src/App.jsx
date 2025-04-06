@@ -840,11 +840,33 @@ function App() {
           </div>
         )}
       </div>
-      <footer className="mt-2 flex justify-center items-center">
-        <div className="bg-black/40 p-2  rounded-lg border-l-4 border-cyan-600">
-          <h2 className="text-cyan-400 text-lg uppercase tracking-wide flex items-center  font-semibold">
+      <footer className="mt-2 flex flex-col md:flex-row justify-center items-center space-y-4 md:space-y-0 md:space-x-4">
+        {/* Copyright */}
+        <div className="bg-black/40 p-2 rounded-lg border-l-4 border-cyan-600">
+          <h2 className="text-cyan-400 text-lg uppercase tracking-wide font-semibold">
             &#169; Ci3t {new Date().getFullYear()}
           </h2>
+        </div>
+        {/* PayPal Donate Button */}
+        <div className="bg-black/40 p-2 rounded-lg border border-cyan-500/20">
+          <form
+            action="https://www.paypal.com/donate"
+            method="post"
+            target="_top"
+          >
+            <input
+              type="hidden"
+              name="hosted_button_id"
+              value="QUQUW9C58UNJL"
+            />
+            <input
+              type="image"
+              src="https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif"
+              name="submit"
+              alt="Donate with PayPal button"
+              className="w-auto h-auto"
+            />
+          </form>
         </div>
       </footer>
     </div>
