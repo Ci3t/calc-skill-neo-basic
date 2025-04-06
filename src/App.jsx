@@ -383,13 +383,14 @@ function App() {
           Skill Damage Calculator
         </h1>
 
-        {/* Instructions Section */}
         <div className="bg-black/40 p-5 rounded-lg border-l-4 border-yellow-600 mb-6">
           <h2 className="text-yellow-400 text-lg uppercase tracking-wide flex items-center mb-4 font-semibold">
             <span className="w-2 h-2 bg-yellow-400 rounded-full mr-2"></span>
             Instructions
           </h2>
-          <div className="text-yellow-200 space-y-3 text-sm">
+
+          <div className="text-red-400 space-y-3 text-sm">
+            {/* Important Notes */}
             <p>
               <strong>Important Notes:</strong>
             </p>
@@ -399,41 +400,82 @@ function App() {
                 enemy (based on training dummy tests).
               </li>
               <li>
-                Expect 700-1000 less damage on actual enemies due to their
-                defense values.
+                Expect <strong>700–1000 less damage</strong> on actual enemies
+                due to defense.
               </li>
               <li>
-                The results provide a good estimate but should be taken with a
-                grain of salt.
+                Results are <strong>estimates</strong> meant to guide your build
+                — not exact values.
+              </li>
+              <li>
+                <strong>Crit Rate</strong> and{" "}
+                <strong>Crit Damage Multiplier</strong> use{" "}
+                <strong>community-based formulas</strong>. They are not official
+                but closely match in-game results.
               </li>
             </ul>
-
+          </div>
+          <div className="text-cyan-200 text-sm">
+            {/* How to Use */}
             <p className="mt-3">
               <strong>How to Use:</strong>
             </p>
             <ol className="list-decimal pl-5 space-y-2">
               <li>
-                Fill in your base skill damage and character stats values.{" "}
-                {" (Press K and hover your skill to get numbers)"}
+                Enter your base skill damage and character stats.{" "}
+                <span className="text-yellow-300">
+                  (Press K and hover your skill in-game)
+                </span>
               </li>
               <li>
-                <strong className="text-red-500">
-                  For skills with existing GM levels:
-                </strong>{" "}
-                Use the Current GM Level selector to indicate how many GM levels
-                your skill already has.
+                If your skill already has books applied, set the{" "}
+                <strong className="text-red-500">Current GM Level</strong>{" "}
+                accordingly.
               </li>
               <li>
-                <strong>For testing additional books:</strong> Use the book
-                selector to add additional books you want to simulate.
+                To test extra GM books, use the <strong>Book Selector</strong>{" "}
+                to add them.
               </li>
               <li>
-                Press the Calculate button to get your damage information.
+                <strong>Balance Tweak Slider:</strong> Use this slider to adjust
+                crit damage scaling.
+                <br />
+                Match it to your in-game average crit range — then test GM book
+                bonuses for that skill.
+              </li>
+              <li>
+                <strong>AP Modifier Conversion:</strong>
+                Use this only when upgrading your base skill to a higher-tier
+                book. For example:
+                <br />
+                You have 3 Blue Ice Rains and want to simulate a Purple one:
+                <ul className="list-disc pl-5 mt-2 space-y-1">
+                  <li>
+                    Set the Blue book’s AP Modifier as <strong>Current</strong>.
+                  </li>
+                  <li>
+                    Set the Purple book’s AP Modifier as <strong>New</strong>.
+                  </li>
+                  <li>
+                    Click <strong>"Convert Skill Tier"</strong> once. It will
+                    simulate having that higher-tier book as your base skill.
+                  </li>
+                  <li>
+                    After that, use the Book Selector below to add more books
+                    for GM testing.
+                  </li>
+                </ul>
+              </li>
+              <li>
+                Finally, press <strong>"Calculate"</strong> to view damage
+                output.
               </li>
             </ol>
-
+          </div>
+          <div className="text-yellow-500 text-sm">
+            {/* Skill Books Reference */}
             <p className="mt-3">
-              <strong>Skill Books Reference:</strong>
+              <strong>📚 Skill Books Reference:</strong>
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
               <div className="bg-green-900/30 p-2 rounded border border-green-500/30">
@@ -455,7 +497,6 @@ function App() {
             </div>
           </div>
         </div>
-
         <div className="grid md:grid-cols-2 gap-6">
           {/* Left Column */}
           <>
@@ -501,6 +542,18 @@ function App() {
                   </div>
                 </div>
                 {/* AP Modifier Conversion Section */}
+                <p className="mt-4 text-yellow-300 text-sm">
+                  🔗 You can look up skill AP modifiers at{" "}
+                  <a
+                    href="https://yast.vercel.app/?subView=%22SkillView%22&p=%22NEOEU190325%22"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline text-cyan-400 hover:text-cyan-300"
+                  >
+                    yast.vercel.app
+                  </a>
+                </p>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                   <div>
                     <label
