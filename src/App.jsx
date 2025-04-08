@@ -31,90 +31,6 @@ const GM_PERCENT_LOOKUP = [
   215.4, 215.7, 216.0, 216.3, 216.6, 216.9, 217.2, 217.5, 217.8,
 ];
 
-// --- Crit Multiplier (fixed) ---
-function calculateCritMultiplier(cdmgPoints) {
-  return (180 * cdmgPoints) / (1800 + cdmgPoints) + 125;
-}
-
-const getGmPercent = (gmLevel) => {
-  // The max level with a defined percentage
-  const MAX_GM_LEVEL = 306;
-  const MAX_GM_PERCENT = 217.8;
-
-  // If level is beyond our maximum, return the max percentage
-  if (gmLevel > MAX_GM_LEVEL) {
-    return MAX_GM_PERCENT;
-  }
-
-  // Otherwise return the lookup value or fallback
-  return GM_PERCENT_LOOKUP[gmLevel] ?? 0;
-};
-
-// --- Crit Scale (based on crit multiplier) ---
-function calculateCritScale(multiplier) {
-  return 1 + Math.min(0.07, (multiplier - 150) / 600);
-}
-
-// --- Crit Rate (based on crit points) ---
-function calculateCritRate(critPoints) {
-  return (96.98979 * critPoints) / (1124.069 + critPoints);
-}
-
-// --- Weighted average base (used for crit smoothing) ---
-function calculateAnchorBase(baseMin, baseMax, totalStats) {
-  const avgBase = (baseMin + baseMax) / 2;
-  const weight = Math.min(1, Math.max(0, (totalStats - 2500) / 3500));
-  return baseMin * (1 - weight) + avgBase * weight;
-}
-function calculateUniversalCrit(inputData) {
-  const {
-    minDamage = 0,
-    maxDamage = 0,
-    attackPower = 0,
-    soulBadge = 0,
-    critDmg = 0,
-    crit = 0,
-  } = inputData || {};
-
-  const baseAvg = (parseFloat(minDamage) + parseFloat(maxDamage)) / 2;
-  const ap = parseFloat(attackPower);
-  const badgeMult = parseFloat(soulBadge) / 100;
-  const critDmgPoints = parseFloat(critDmg);
-
-  const totalStats = ap + critDmgPoints;
-
-  // 📈 Smoother tiering (no jumps)
-  const scaleFactor = Math.min(1.2, Math.max(0.85, totalStats / 4800)); // floats between ~0.85 – 1.2
-
-  const apScale = 0.62 + scaleFactor * 0.3;
-  const baseScale = 0.88 + scaleFactor * 0.1;
-  const critBase = 1.27 + scaleFactor * 0.15;
-  const critScale = 0.00028 + scaleFactor * 0.00004;
-
-  const totalBase = baseAvg * baseScale + ap * apScale + ap * badgeMult;
-  const critMult = critBase + critDmgPoints * critScale;
-  const avgCrit = totalBase * critMult * 0.95;
-
-  const variance = avgCrit * 0.04;
-  const critMin = avgCrit - variance;
-  const critMax = avgCrit + variance;
-
-  return {
-    average: avgCrit.toFixed(2),
-    min: critMin.toFixed(2),
-    max: critMax.toFixed(2),
-  };
-}
-
-// --- AP Multiplier Conversion ---
-function convertSkillDamage(min, max, oldMultiplier, newMultiplier) {
-  const factor = newMultiplier / oldMultiplier;
-  return {
-    newMin: (parseFloat(min) || 0) * factor,
-    newMax: (parseFloat(max) || 0) * factor,
-  };
-}
-
 function App() {
   const [result, setResult] = useState(null);
   const [formData, setFormData] = useState({
@@ -130,8 +46,8 @@ function App() {
     currentApMod: "",
     newApMod: "",
     skillApMultiplier: "1.05",
-    balanceTweak: "1.00", // balance slider, defaults to 1
-    onrush: false, // ✅ add this
+    balanceTweak: "1.00", // defaults to 1
+    onrush: false,
   });
 
   const bookTypes = [
@@ -171,40 +87,24 @@ function App() {
 
   const [books, setBooks] = useState(bookTypes);
 
-  const currentGMPercent = formData.currentGMLevel * 1.9;
-
   const getGmPercent = (gmLevel) => {
-    // The max level with a defined percentage
     const MAX_GM_LEVEL = 306;
     const MAX_GM_PERCENT = 217.8;
-
-    // If level is beyond our maximum, return the max percentage
     if (gmLevel > MAX_GM_LEVEL) {
       return MAX_GM_PERCENT;
     }
-
-    // Otherwise return the lookup value or fallback
     return GM_PERCENT_LOOKUP[gmLevel] ?? 0;
   };
 
   const calculateGMTotals = () => {
     let totalGmLevel = 0;
-
     books.forEach((book) => {
       totalGmLevel += book.level * book.count;
     });
-
-    // Limit the GM level to the maximum of 312
     const MAX_GM_LEVEL = 306;
     const limitedGmLevel = Math.min(totalGmLevel, MAX_GM_LEVEL);
-
-    // Get the percentage using the getGmPercent function
     const percentPerLevel = getGmPercent(limitedGmLevel);
-
-    return {
-      gmLevel: limitedGmLevel, // Return the limited GM level
-      percentPerLevel,
-    };
+    return { gmLevel: limitedGmLevel, percentPerLevel };
   };
 
   const handleChange = (e) => {
@@ -224,23 +124,16 @@ function App() {
 
   const handleBookCountChange = (bookId, change) => {
     const MAX_GM_LEVEL = 306;
-
     setBooks((prevBooks) => {
-      // First calculate the total GM level
       const totalGmLevel = prevBooks.reduce(
         (sum, b) => sum + b.level * b.count,
         0
       );
-
       return prevBooks.map((book) => {
         if (book.id !== bookId) return book;
-
         const newCount = book.count + change;
         const newLevel = totalGmLevel + change * book.level;
-
-        // Disallow count below 0 or level above max
         if (newCount < 0 || newLevel > MAX_GM_LEVEL) return book;
-
         return { ...book, count: newCount };
       });
     });
@@ -263,28 +156,35 @@ function App() {
     }));
   };
 
-  const calculateDamage = () => {
-    const { minDamage, maxDamage, attackPower, soulBadge, crit, critDmg } =
-      formData;
+  // AP Multiplier Conversion
+  function convertSkillDamage(min, max, oldMultiplier, newMultiplier) {
+    const factor = newMultiplier / oldMultiplier;
+    return {
+      newMin: (parseFloat(min) || 0) * factor,
+      newMax: (parseFloat(max) || 0) * factor,
+    };
+  }
 
+  const calculateDamage = () => {
+    const {
+      minDamage,
+      maxDamage,
+      attackPower,
+      soulBadge,
+      crit,
+      critDmg,
+      balanceTweak,
+    } = formData;
     const { gmLevel, percentPerLevel } = calculateGMTotals();
     const currentGM = parseInt(formData.currentGMLevel) || 0;
-
     const min = parseFloat(minDamage);
     const max = parseFloat(maxDamage);
     const ap = parseFloat(attackPower);
     const badgePercent = parseFloat(soulBadge) || 0;
-    const critValue = parseFloat(crit);
     const critDmgValue = parseFloat(critDmg);
-    const balance = parseFloat(formData.balanceTweak) || 1.0;
+    const balance = parseFloat(balanceTweak) || 1.0;
 
-    if (
-      isNaN(min) ||
-      isNaN(max) ||
-      isNaN(ap) ||
-      isNaN(critValue) ||
-      isNaN(critDmgValue)
-    ) {
+    if (isNaN(min) || isNaN(max) || isNaN(ap) || isNaN(critDmgValue)) {
       setResult({
         error: true,
         message: "⚠️ Please fill in all required fields.",
@@ -292,44 +192,31 @@ function App() {
       return;
     }
 
-    // Calculate Crit Damage using new universal scaling
+    // Base averages and scaling
     const baseAvg = (min + max) / 2;
     const badgeMult = badgePercent / 100;
-    // Total character stats for tier scaling
     const totalStats = ap + critDmgValue;
-
-    // Smooth scaling factor based on stat tier
     const scaleFactor = Math.min(1.2, Math.max(0.85, totalStats / 4800));
     const apScale = 0.62 + scaleFactor * 0.3;
     const baseScale = 0.88 + scaleFactor * 0.1;
     const critBase = 1.27 + scaleFactor * 0.15;
     const critScale = (0.00028 + scaleFactor * 0.00004) * balance;
 
-    // 🎯 Only use books for damage calculation (currentGM is visual only)
-    // const gmPercentFromTable = GM_PERCENT_LOOKUP[gmLevel] ?? gmLevel * 1.9;
+    // Use only books for damage calc (currentGM is visual only)
     const gmPercentFromTable = getGmPercent(gmLevel);
     const gmPercentBonus = gmPercentFromTable * 0.728; // damage scale
 
-    // Adjusted base average
     const adjustedBaseAvg = baseAvg + (baseAvg * gmPercentBonus) / 100;
-
-    // Base + AP + Badge
     const totalBase =
       adjustedBaseAvg * baseScale + ap * apScale + ap * badgeMult;
-
-    // Crit calculation
     const critMultiplier = critBase + critDmgValue * critScale;
     const avgCrit = totalBase * critMultiplier * (0.95 * balance);
-
-    // Variance
     const variance = avgCrit * 0.04;
     const critMin = avgCrit - variance;
     const critMax = avgCrit + variance;
 
-    // 🎯 Show UI base damage (min/max) with full GM effect (books + currentGM — for display only)
-    const totalGMPercent = percentPerLevel + currentGM * 1.9;
-    const gmDisplayBonus = (totalGMPercent * 0.728) / 100;
-
+    // Display: Only use books for GM bonus (exclude currentGM)
+    const gmDisplayBonus = (percentPerLevel * 0.728) / 100;
     const adjustedBaseMin = min + min * gmDisplayBonus;
     const adjustedBaseMax = max + max * gmDisplayBonus;
     const avgNormalHit = totalBase.toFixed(2);
@@ -345,19 +232,16 @@ function App() {
         0
       )} – ${adjustedBaseMax.toFixed(0)}`,
       normalDamage: `🔸 Non-Crit Damage: ${normalMin} – ${normalMax}`,
-
       critDamage: `🔹 Crit Range: ${critMin.toFixed(2)} – ${critMax.toFixed(
         2
       )}`,
       avgNormalHit: `⚪ Avg Hit (non-crit): ${avgNormalHit}`,
       avgCritHit: `💥 Avg Crit Damage: ${avgCrit.toFixed(2)}`,
-      // critRateCalculated: `📈 Crit Rate: ${critRate.toFixed(2)}%`,
-      visualTotalLevel: gmLevel + currentGM,
-      visualTotalPercent: percentPerLevel + currentGM * 1.9,
+      visualTotalLevel: gmLevel,
+      visualTotalPercent: percentPerLevel.toFixed(2),
     });
   };
 
-  // Get GM totals for display
   const { gmLevel, percentPerLevel } = calculateGMTotals();
 
   return (
@@ -367,7 +251,9 @@ function App() {
           Skill Damage Calculator
         </h1>
 
+        {/* Instructions and Info */}
         <div className="bg-black/40 p-5 rounded-lg border-l-4 border-yellow-600 mb-6">
+          {/* Credits */}
           <div className="mt-8 text-xs text-gray-400 text-center bg-black/40 p-3 rounded-lg border border-yellow-600/20">
             <p>
               📜 <strong>Credits & Sources</strong>
@@ -394,6 +280,7 @@ function App() {
               Updated for Moonwater Patch
             </p>
           </div>
+
           <h2 className="text-yellow-400 text-lg uppercase tracking-wide flex items-center mb-4 font-semibold">
             <span className="w-2 h-2 bg-yellow-400 rounded-full mr-2"></span>
             Instructions
@@ -442,7 +329,7 @@ function App() {
               <li>
                 Set your{" "}
                 <strong className="text-red-400">Current GM Level</strong> if
-                your skill already has books.
+                your skill already has books applied.
               </li>
               <li>
                 Use the <strong>Book Selector</strong> to simulate extra books.
@@ -503,6 +390,7 @@ function App() {
             </div>
           </div>
         </div>
+
         <div className="grid md:grid-cols-2 gap-6">
           {/* Left Column */}
           <>
@@ -513,7 +401,7 @@ function App() {
                   <span className="w-2 h-2 bg-cyan-400 rounded-full mr-2"></span>
                   Base Skill Damage
                 </h2>
-                <div className=" grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label
                       htmlFor="minDamage"
@@ -616,13 +504,13 @@ function App() {
                     If your skill already has books applied, set this to your
                     current GM level.{" "}
                     <span className="font-semibold text-red-500">
-                      {" (each level = 1.90%)"}
-                    </span>{" "}
+                      (each level = 1.90%)
+                    </span>
                   </p>
                   <div className="flex items-center">
                     <button
                       onClick={() => handleCurrentGMLevelChange(-1)}
-                      className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-900 text-purple-300  text-xl hover:bg-purple-800 transition-colors cursor-pointer"
+                      className="flex items-center justify-center w-8 h-8 rounded-full bg-gray-900 text-purple-300 text-xl hover:bg-purple-800 transition-colors cursor-pointer"
                     >
                       -
                     </button>
@@ -651,7 +539,6 @@ function App() {
                   <span className="w-2 h-2 bg-cyan-400 rounded-full mr-2"></span>
                   Grandmaster Skill
                 </h2>
-
                 {/* Book selection interface */}
                 <div className="space-y-3">
                   {books.map((book) => (
@@ -700,23 +587,15 @@ function App() {
                     </div>
                   </div>
 
-                  {/* Visual Total GM Summary (GM level + books) */}
+                  {/* Visual Total GM Summary (Books only) */}
                   <div className="mt-2 p-3 bg-gray-800/40 rounded-lg border border-yellow-500/20">
                     <div className="flex justify-between text-yellow-300 font-semibold">
                       <span>Total GM Level:</span>
-                      <span>
-                        {gmLevel + (parseInt(formData.currentGMLevel) || 0)}
-                      </span>
+                      <span>{gmLevel}</span>
                     </div>
                     <div className="flex justify-between text-yellow-300 font-semibold mt-1">
                       <span>Total Percent:</span>
-                      <span>
-                        {(
-                          percentPerLevel +
-                          (parseInt(formData.currentGMLevel) || 0) * 1.9
-                        ).toFixed(2)}
-                        %
-                      </span>
+                      <span>{percentPerLevel.toFixed(2)}%</span>
                     </div>
                   </div>
                 </div>
@@ -805,7 +684,7 @@ function App() {
               accuracy={formData.accuracy}
               debuffResist={formData.debuffResist}
               onChange={handleChange}
-              onrush={formData.onrush} // ✅ pass it
+              onrush={formData.onrush}
             />
           </div>
         </div>
