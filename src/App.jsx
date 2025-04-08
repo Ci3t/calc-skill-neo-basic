@@ -2,112 +2,53 @@ import { useState } from "react";
 import CombatStatsOverview from "./CombatStatsOverview";
 
 const GM_PERCENT_LOOKUP = [
-  0.0,
-  1.9,
-  3.8,
-  5.7,
-  7.6,
-  9.5,
-  11.4,
-  13.3,
-  15.2,
-  17.1,
-  19.0,
-  20.9,
-  22.8,
-  24.7,
-  26.6,
-  28.5,
-  30.0,
-  31.5,
-  33.0,
-  34.5,
-  36.0,
-  37.5,
-  39.0,
-  40.5,
-  42.0,
-  43.5,
-  45.0,
-  46.5,
-  48.0,
-  49.5,
-  51.0,
-  52.5,
-  54.0,
-  55.5,
-  57.0,
-  58.5,
-  59.6,
-  60.7,
-  61.8,
-  62.9,
-  64.0,
-  65.1,
-  66.2,
-  67.3,
-  68.4,
-  69.5,
-  70.6,
-  71.7,
-  72.8,
-  73.9,
-  75.0,
-  76.1,
-  77.2,
-  78.3,
-  79.4,
-  80.5,
-  81.6,
-  82.7,
-  83.8,
-  84.9,
-  86.0,
-  87.1,
-  88.2,
-  89.3,
-  90.4,
-  91.5,
-  92.6,
-  93.7,
-  94.8,
-  95.9,
-  97.0,
-  98.1,
-  99.2,
-  100.3,
-  101.4,
-  102.5,
-  103.6,
-  104.7,
-  105.8,
-  106.9,
-  108.0,
-  109.1,
-  110.2,
-  111.3,
-  112.4,
-  113.5,
-  114.6,
-  115.7,
-  116.8,
-  117.9,
-  119.0,
-  120.1,
-  121.2,
-  122.3,
-  123.4,
-  124.5,
-  125.6,
-  126.7,
-  127.8,
-  128.9,
-  130.0, // up to 130 GM levels, you can add more
+  0.0, 1.9, 3.8, 5.7, 7.6, 9.5, 11.4, 13.3, 15.2, 17.1, 19.0, 20.9, 22.8, 24.7,
+  26.6, 28.5, 30.0, 31.5, 33.0, 34.5, 36.0, 37.5, 39.0, 40.5, 42.0, 43.5, 45.0,
+  46.5, 48.0, 49.5, 51.0, 52.5, 54.0, 55.5, 57.0, 58.5, 59.6, 60.7, 61.8, 62.9,
+  64.0, 65.1, 66.2, 67.3, 68.4, 69.5, 70.6, 71.7, 72.8, 73.9, 75.0, 76.1, 77.2,
+  78.3, 79.4, 80.5, 81.6, 82.7, 83.8, 84.9, 86.0, 87.1, 88.2, 89.3, 90.4, 91.5,
+  92.6, 93.7, 94.8, 95.9, 97.0, 98.1, 99.2, 100.3, 101.4, 102.5, 103.6, 104.7,
+  105.8, 106.9, 108.0, 109.1, 110.2, 111.3, 112.4, 113.5, 114.6, 115.7, 116.8,
+  117.9, 119.0, 120.1, 121.2, 122.3, 123.4, 124.5, 125.6, 126.7, 127.8, 128.9,
+  130.0, 130.7, 131.4, 132.1, 132.8, 133.5, 134.2, 134.9, 135.6, 136.3, 137.0,
+  137.7, 138.4, 139.1, 139.8, 140.5, 141.2, 141.9, 142.6, 143.3, 144.0, 144.7,
+  145.4, 146.1, 146.8, 147.5, 148.2, 148.9, 149.6, 150.3, 151.0, 151.7, 152.4,
+  153.1, 153.8, 154.5, 155.2, 155.9, 156.6, 157.3, 158.0, 158.7, 159.4, 160.1,
+  160.8, 161.5, 162.2, 162.9, 163.6, 164.3, 165.0, 165.7, 166.4, 167.1, 167.8,
+  168.5, 169.2, 169.9, 170.6, 171.3, 172.0, 172.7, 173.4, 174.1, 174.8, 175.5,
+  175.8, 176.1, 176.4, 176.7, 177.0, 177.3, 177.6, 177.9, 178.2, 178.5, 178.8,
+  179.1, 179.4, 179.7, 180.0, 180.3, 180.6, 180.9, 181.2, 181.5, 181.8, 182.1,
+  182.4, 182.7, 183.0, 183.3, 183.6, 183.9, 184.2, 184.5, 184.8, 185.1, 185.4,
+  185.7, 186.0, 186.3, 186.6, 186.9, 187.2, 187.5, 187.8, 188.1, 188.4, 188.7,
+  189.0, 189.3, 189.6, 189.9, 190.2, 190.5, 190.8, 191.1, 191.4, 191.7, 192.0,
+  192.3, 192.6, 192.9, 193.2, 193.5, 193.8, 194.1, 194.4, 194.7, 195.0, 195.3,
+  195.6, 195.9, 196.2, 196.5, 196.8, 197.1, 197.4, 197.7, 198.0, 198.3, 198.6,
+  198.9, 199.2, 199.5, 199.8, 200.1, 200.4, 200.7, 201.0, 201.3, 201.6, 201.9,
+  202.2, 202.5, 202.8, 203.1, 203.4, 203.7, 204.0, 204.3, 204.6, 204.9, 205.2,
+  205.5, 205.8, 206.1, 206.4, 206.7, 207.0, 207.3, 207.6, 207.9, 208.2, 208.5,
+  208.8, 209.1, 209.4, 209.7, 210.0, 210.3, 210.6, 210.9, 211.2, 211.5, 211.8,
+  212.1, 212.4, 212.7, 213.0, 213.3, 213.6, 213.9, 214.2, 214.5, 214.8, 215.1,
+  215.4, 215.7, 216.0, 216.3, 216.6, 216.9, 217.2, 217.5, 217.8,
 ];
+
 // --- Crit Multiplier (fixed) ---
 function calculateCritMultiplier(cdmgPoints) {
   return (180 * cdmgPoints) / (1800 + cdmgPoints) + 125;
 }
+
+const getGmPercent = (gmLevel) => {
+  // The max level with a defined percentage
+  const MAX_GM_LEVEL = 306;
+  const MAX_GM_PERCENT = 217.8;
+
+  // If level is beyond our maximum, return the max percentage
+  if (gmLevel > MAX_GM_LEVEL) {
+    return MAX_GM_PERCENT;
+  }
+
+  // Otherwise return the lookup value or fallback
+  return GM_PERCENT_LOOKUP[gmLevel] ?? 0;
+};
 
 // --- Crit Scale (based on crit multiplier) ---
 function calculateCritScale(multiplier) {
@@ -190,6 +131,7 @@ function App() {
     newApMod: "",
     skillApMultiplier: "1.05",
     balanceTweak: "1.00", // balance slider, defaults to 1
+    onrush: false, // ✅ add this
   });
 
   const bookTypes = [
@@ -231,21 +173,46 @@ function App() {
 
   const currentGMPercent = formData.currentGMLevel * 1.9;
 
+  const getGmPercent = (gmLevel) => {
+    // The max level with a defined percentage
+    const MAX_GM_LEVEL = 306;
+    const MAX_GM_PERCENT = 217.8;
+
+    // If level is beyond our maximum, return the max percentage
+    if (gmLevel > MAX_GM_LEVEL) {
+      return MAX_GM_PERCENT;
+    }
+
+    // Otherwise return the lookup value or fallback
+    return GM_PERCENT_LOOKUP[gmLevel] ?? 0;
+  };
+
   const calculateGMTotals = () => {
-    let gmLevel = 0;
+    let totalGmLevel = 0;
 
     books.forEach((book) => {
-      gmLevel += book.level * book.count;
+      totalGmLevel += book.level * book.count;
     });
 
-    const percentPerLevel = GM_PERCENT_LOOKUP[gmLevel] ?? 0; // fallback to 0 if undefined
+    // Limit the GM level to the maximum of 312
+    const MAX_GM_LEVEL = 306;
+    const limitedGmLevel = Math.min(totalGmLevel, MAX_GM_LEVEL);
 
-    return { gmLevel, percentPerLevel };
+    // Get the percentage using the getGmPercent function
+    const percentPerLevel = getGmPercent(limitedGmLevel);
+
+    return {
+      gmLevel: limitedGmLevel, // Return the limited GM level
+      percentPerLevel,
+    };
   };
 
   const handleChange = (e) => {
     const { id, value } = e.target;
-    setFormData((prev) => ({ ...prev, [id]: value }));
+    setFormData((prev) => ({
+      ...prev,
+      [id]: id === "onrush" ? value === "true" || value === true : value,
+    }));
   };
 
   const handleCurrentGMLevelChange = (change) => {
@@ -256,13 +223,27 @@ function App() {
   };
 
   const handleBookCountChange = (bookId, change) => {
-    setBooks((prev) =>
-      prev.map((book) =>
-        book.id === bookId
-          ? { ...book, count: Math.max(0, book.count + change) }
-          : book
-      )
-    );
+    const MAX_GM_LEVEL = 306;
+
+    setBooks((prevBooks) => {
+      // First calculate the total GM level
+      const totalGmLevel = prevBooks.reduce(
+        (sum, b) => sum + b.level * b.count,
+        0
+      );
+
+      return prevBooks.map((book) => {
+        if (book.id !== bookId) return book;
+
+        const newCount = book.count + change;
+        const newLevel = totalGmLevel + change * book.level;
+
+        // Disallow count below 0 or level above max
+        if (newCount < 0 || newLevel > MAX_GM_LEVEL) return book;
+
+        return { ...book, count: newCount };
+      });
+    });
   };
 
   const handleTierConvert = () => {
@@ -277,6 +258,8 @@ function App() {
       ...prev,
       minDamage: newMin.toFixed(0),
       maxDamage: newMax.toFixed(0),
+      currentApMod: "",
+      newApMod: "",
     }));
   };
 
@@ -323,7 +306,8 @@ function App() {
     const critScale = (0.00028 + scaleFactor * 0.00004) * balance;
 
     // 🎯 Only use books for damage calculation (currentGM is visual only)
-    const gmPercentFromTable = GM_PERCENT_LOOKUP[gmLevel] ?? gmLevel * 1.9;
+    // const gmPercentFromTable = GM_PERCENT_LOOKUP[gmLevel] ?? gmLevel * 1.9;
+    const gmPercentFromTable = getGmPercent(gmLevel);
     const gmPercentBonus = gmPercentFromTable * 0.728; // damage scale
 
     // Adjusted base average
@@ -384,97 +368,119 @@ function App() {
         </h1>
 
         <div className="bg-black/40 p-5 rounded-lg border-l-4 border-yellow-600 mb-6">
+          <div className="mt-8 text-xs text-gray-400 text-center bg-black/40 p-3 rounded-lg border border-yellow-600/20">
+            <p>
+              📜 <strong>Credits & Sources</strong>
+            </p>
+            <p className="mt-1">
+              Calculator created by{" "}
+              <span className="text-cyan-300 font-medium">Ci3t</span>
+            </p>
+            <p>
+              Data transcribed by{" "}
+              <span className="text-cyan-300 font-medium">Soviet Panda</span>{" "}
+              [NA-Heaven's Reach]
+            </p>
+            <p>
+              Source research and KR info compiled by{" "}
+              <span className="text-yellow-300 font-semibold">Yasin</span> (
+              <em>subscribe to him below</em>)
+            </p>
+            <p className="italic mt-1">
+              Special thanks to <strong>YasinBakh</strong> for gathering and
+              publishing core Korean data used in this tool.
+            </p>
+            <p className="mt-1 text-green-300 font-semibold">
+              Updated for Moonwater Patch
+            </p>
+          </div>
           <h2 className="text-yellow-400 text-lg uppercase tracking-wide flex items-center mb-4 font-semibold">
             <span className="w-2 h-2 bg-yellow-400 rounded-full mr-2"></span>
             Instructions
           </h2>
 
           <div className="text-red-400 space-y-3 text-sm">
-            {/* Important Notes */}
             <p>
               <strong>Important Notes:</strong>
             </p>
             <ul className="list-disc pl-5 space-y-2">
               <li>
-                This calculator assumes <strong>zero defense</strong> on the
-                enemy (based on training dummy tests).
+                Best tested on <strong>training dummies</strong> — they have no
+                defense.
               </li>
               <li>
-                Expect <strong>700–1000 less damage</strong> on actual enemies
-                due to defense.
+                Expect <strong>~700–1000 less damage</strong> in actual
+                dungeons. Use the{" "}
+                <strong className="text-yellow-300">Balance Tweak</strong>{" "}
+                slider to match your real boss damage.
               </li>
               <li>
-                Results are <strong>estimates</strong> meant to guide your build
-                — not exact values.
+                This calculator gives a <strong>close estimate</strong>, not a
+                100% match. Use it to compare builds, books, and upgrades.
               </li>
               <li>
                 <strong>Crit Rate</strong> and{" "}
                 <strong>Crit Damage Multiplier</strong> use{" "}
-                <strong>community-based formulas</strong>. They are not official
-                but closely match in-game results.
+                <strong>community formulas</strong>. Not official, but they
+                align well with what you see in-game.
               </li>
             </ul>
           </div>
+
           <div className="text-cyan-200 text-sm">
-            {/* How to Use */}
             <p className="mt-3">
               <strong>How to Use:</strong>
             </p>
             <ol className="list-decimal pl-5 space-y-2">
               <li>
-                Enter your base skill damage and character stats.{" "}
+                Input your base skill damage and stats (
                 <span className="text-yellow-300">
-                  (Press K and hover your skill in-game)
+                  Press K and hover your skill
                 </span>
+                ).
               </li>
               <li>
-                If your skill already has books applied, set the{" "}
-                <strong className="text-red-500">Current GM Level</strong>{" "}
-                accordingly.
+                Set your{" "}
+                <strong className="text-red-400">Current GM Level</strong> if
+                your skill already has books.
               </li>
               <li>
-                To test extra GM books, use the <strong>Book Selector</strong>{" "}
-                to add them.
+                Use the <strong>Book Selector</strong> to simulate extra books.
               </li>
               <li>
-                <strong>Balance Tweak Slider:</strong> Use this slider to adjust
-                crit damage scaling.
-                <br />
-                Match it to your in-game average crit range — then test GM book
-                bonuses for that skill.
+                Use the <strong>Balance Slider</strong> to match in-game average
+                crit range.
               </li>
               <li>
-                <strong>AP Modifier Conversion:</strong>
-                Use this only when upgrading your base skill to a higher-tier
-                book. For example:
-                <br />
-                You have 3 Blue Ice Rains and want to simulate a Purple one:
+                <strong>AP Modifier Conversion:</strong> Use only when upgrading
+                to a higher-tier skill book.
                 <ul className="list-disc pl-5 mt-2 space-y-1">
+                  <li>Enter current and new AP modifiers.</li>
                   <li>
-                    Set the Blue book’s AP Modifier as <strong>Current</strong>.
+                    Click <strong>"Convert Skill Tier"</strong> to simulate it.
                   </li>
-                  <li>
-                    Set the Purple book’s AP Modifier as <strong>New</strong>.
-                  </li>
-                  <li>
-                    Click <strong>"Convert Skill Tier"</strong> once. It will
-                    simulate having that higher-tier book as your base skill.
-                  </li>
-                  <li>
-                    After that, use the Book Selector below to add more books
-                    for GM testing.
-                  </li>
+                  <li>Then use the Book Selector for GM testing.</li>
                 </ul>
               </li>
               <li>
-                Finally, press <strong>"Calculate"</strong> to view damage
-                output.
+                Press <strong>"Calculate"</strong> for results.
+              </li>
+              <li className="text-yellow-400 font-semibold">
+                Prefer watching instead? 🎥
+                <a
+                  href="https://www.youtube.com/watch?v=GhYvH4RCkBM"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-cyan-300 underline ml-1 hover:text-cyan-200"
+                >
+                  Watch the video guide
+                </a>
               </li>
             </ol>
           </div>
-          <div className="text-yellow-500 text-sm">
-            {/* Skill Books Reference */}
-            <p className="mt-3">
+
+          <div className="text-yellow-500 text-sm mt-4">
+            <p>
               <strong>📚 Skill Books Reference:</strong>
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
@@ -632,7 +638,7 @@ function App() {
                     <div className="ml-4">
                       <span className="text-purple-200">GM Percent: </span>
                       <span className="text-white font-medium">
-                        {GM_PERCENT_LOOKUP[formData.currentGMLevel] || 0}%
+                        {getGmPercent(formData.currentGMLevel)}%
                       </span>
                     </div>
                   </div>
@@ -764,7 +770,7 @@ function App() {
               {/* Balance Tweak Slider */}
               <div className="bg-black/40 p-5 rounded-lg border-l-4 border-yellow-600 mt-4">
                 <h2 className="text-yellow-400 text-lg uppercase tracking-wide mb-4 font-semibold">
-                  Balance Tweak (Dev Tool)
+                  Balance Tweak
                 </h2>
                 <div className="flex flex-col gap-2">
                   <label
@@ -799,6 +805,7 @@ function App() {
               accuracy={formData.accuracy}
               debuffResist={formData.debuffResist}
               onChange={handleChange}
+              onrush={formData.onrush} // ✅ pass it
             />
           </div>
         </div>
