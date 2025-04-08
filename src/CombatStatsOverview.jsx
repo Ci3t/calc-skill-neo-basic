@@ -1,17 +1,23 @@
 import { useState } from "react";
 
-function calculateCritRate(critPoints) {
-  return (96.98979 * critPoints) / (1124.069 + critPoints);
+// Corrected Crit Rate formula (returns percentage directly)
+function calculateCritRate(critPoints, onrush = false) {
+  const base = (96.98979 * critPoints) / (critPoints + 2368.384);
+  const extra = onrush ? 10 : 0;
+  return base + extra;
 }
 
+// Corrected Crit Multiplier (returns multiplier like 2.32)
 function calculateCritMultiplier(cdmgPoints) {
-  return (290.8 * cdmgPoints) / (2102.36 + cdmgPoints) + 125;
+  return (cdmgPoints * 290.8) / (cdmgPoints + 2102.36) + 125;
 }
 
+// Accuracy returns % (e.g., 100.12%)
 function calculateAccuracyPercent(points) {
   return (96.16 * points) / (820.5 + points) + 85;
 }
 
+// Debuff Resist returns % (e.g., 85.33%)
 function calculateDebuffResistPercent(points) {
   return (100.0794 * points) / (366.3908 + points);
 }
@@ -22,15 +28,8 @@ export default function CombatStatsOverview({
   accuracy,
   debuffResist,
   onChange,
+  onrush,
 }) {
-  const handleChange = (e) => {
-    const { id, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [id]: value,
-    }));
-  };
-
   const parsedCrit = parseFloat(crit);
   const parsedCritDmg = parseFloat(critDmg);
   const parsedAccuracy = parseFloat(accuracy);
@@ -110,18 +109,37 @@ export default function CombatStatsOverview({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {/* Onrush Checkbox */}
+      <div className="mt-4 flex items-center space-x-3">
+        <input
+          type="checkbox"
+          id="onrush"
+          checked={onrush}
+          onChange={(e) =>
+            onChange({
+              target: { id: "onrush", value: e.target.checked },
+            })
+          }
+          className="w-4 h-4 text-cyan-500 bg-gray-800 border-cyan-500 rounded focus:ring-cyan-400"
+        />
+        <label htmlFor="onrush" className="text-cyan-200 text-l">
+          🌀 Onrush Active (+10% Crit Rate)
+        </label>
+      </div>
+
+      {/* Calculated Values */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
         <div className="flex justify-between text-cyan-200">
           <span>📈 Crit Rate:</span>
           <span className="text-white font-medium">
             {isNaN(parsedCrit)
               ? "--"
-              : `${calculateCritRate(parsedCrit).toFixed(2)}%`}
+              : `${calculateCritRate(parsedCrit, onrush).toFixed(2)}%`}
           </span>
         </div>
 
         <div className="flex justify-between text-cyan-200">
-          <span>🔥 Crit Multiplier:</span>
+          <span>🔥 Crit Damage Multiplier:</span>
           <span className="text-white font-medium">
             {isNaN(parsedCritDmg)
               ? "--"
